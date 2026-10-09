@@ -4,7 +4,7 @@ Road-trip weather planner. Design & rationale live in **[PLAN.md](PLAN.md)** —
 
 ## Where it stands (2026-10-09)
 
-**All 7 milestones complete and verified.** Working tree clean at `4051ab9`. 110 tests pass (`uv run pytest -q`, ~1 s). Dev server runs as the `journey-dev` service on `0.0.0.0:8000` (LAN-reachable; `curl localhost:8000/healthz` → `{"ok":true}`). Live browser E2E done end-to-end: idle, loading, result + map, row selection, validation error, horizon error, and repeat-planning.
+**All 7 milestones complete and verified.** Latest fix `d69f7b9` (Trap 4; 111 tests pass, `uv run pytest -q`, ~1 s; live browser re-verified: Plan → edit Leave-at → Plan updates table/map). Dev server runs as the `journey-dev` service on `0.0.0.0:8000` (LAN-reachable; `curl localhost:8000/healthz` → `{"ok":true}`). Live browser E2E done end-to-end: idle, loading, result + map, row selection, validation error, horizon error, and repeat-planning.
 
 | Milestone | Commit | What |
 |---|---|---|
@@ -16,6 +16,7 @@ Road-trip weather planner. Design & rationale live in **[PLAN.md](PLAN.md)** —
 | 6 UI | `a80123c` | templates, `route-map.js`, CSS, E2E |
 | 7 Hardening | `555085d` | fault-injection, stale/nodata, add-stop limit |
 | — map fix | `4051ab9` | map survived only one plan — see Trap 3 |
+| — re-Plan fix | `d69f7b9` | second Plan silently no-op'd — see Trap 4 |
 
 ## The four integration traps (each cost real debugging; do not regress)
 
