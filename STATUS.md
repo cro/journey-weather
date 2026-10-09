@@ -17,9 +17,9 @@ Road-trip weather planner. Design & rationale live in **[PLAN.md](PLAN.md)** —
 | 7 Hardening | `555085d` | fault-injection, stale/nodata, add-stop limit |
 | — map fix | `4051ab9` | map survived only one plan — see Trap 3 |
 
-## The three integration traps (each cost real debugging; do not regress)
+## The four integration traps (each cost real debugging; do not regress)
 
-These were found **in a live browser**, not from docs — the plan's "verified facts" (§2) were correct but incomplete. All three are documented in PLAN.md §5/§8; they are the most likely things a maintainer will trip on.
+These were found **in a live browser**, not from docs — the plan's "verified facts" (§2) were correct but incomplete. All are documented in PLAN.md §5/§8; they are the most likely things a maintainer will trip on.
 
 **1. Webawesome must register before Datastar (commit `e11ab5d`).**
 `data-bind` reads/writes the element's `value` property. Webawesome's `webawesome.loader.js` defines custom elements *after* Datastar has processed the DOM, so on an undefined `wa-input` the binding connects to nothing — typed text never reaches the signals, form appears to work but sends blanks. `webawesome.js` does NOT help (it only re-exports the loader). Fix in force: `base.html` has an inline module script importing the 8 used components directly (`components/<name>/<name>.js`) **before** the `datastar.js` module. SSE-patched rows are fine (they arrive post-upgrade).
@@ -28,8 +28,12 @@ These were found **in a live browser**, not from docs — the plan's "verified f
 `data-bind:trip.s0.name` (dotted path via colon modifier) silently fails to write back on web components. `data-bind="trip.s0.name"` works. PLAN.md §2 was corrected to reflect this.
 
 **3. Imperative DOM (Leaflet) must live OUTSIDE any Datastar-patched region (commit `4051ab9`).**
-Datastar's `patch-elements` morph **reuses** the existing DOM node by id/position and syncs its attributes/children to the incoming markup. For `<route-map>` that meant stripping Leaflet's injected classes/panes/tiles *without* re-firing `connectedCallback` — the map rendered on the first plan and was a dead empty box on every re-plan. Symptom: table + weather fine, map gone, **no console error, no server error** (so it looks like rate limiting — it is not). Fix: `<route-map id="trip-map">` is a **persistent** element in `index.html`, outside `#route-result`; its data arrives as a `datastar-patch-signals` event setting a `routeJson` signal, consumed via `data-attr:data-route="$routeJson"`. `ResizeObserver → invalidateSize()` handles the hidden→visible transition (`data-show="$planning || $routeJson != ''"`).
+Datastar's `patch-elements` morph **reuses** the existing DOM node by id/position and syncs its attributes/children to the incoming markup. For `<route-map>` that meant stripping Leaflet's injected classes/panes/tiles *without* re-firing `connectedCallback` — the map rendered on the first plan and was a dead empty box on every re-plan. Symptom: table + weather fine, map gone, **no console error, no server error** (so it looks like rate limiting — it is not). Fix: `<route-map id="trip-map">` is a **persistent** element in `index.html`, outside `#route-result`; its data arrives as a `datastar-patch-signals` event setting the `_routeJson` signal (underscore: see Trap 4), consumed via `data-attr:data-route="$_routeJson"`. `ResizeObserver → invalidateSize()` handles the hidden→visible transition (`data-show="$planning || $_routeJson != ''"`).
 **Rule:** any library that injects its own child nodes goes in a persistent element driven by signals, never in patched markup.
+
+**4. Every signal is echoed back in the GET URL; big display-only data MUST be `_`-prefixed (found 2026-10-09).**
+Datastar's `@get` serializes ALL signals (default `filterSignals` exclude regex `/(^|\.)_/`, confirmed in the vendored 1.0.4 bundle) into the `datastar` query parameter of every request. The map geometry was parked in a plain `routeJson` signal (~94 KB for the 2-stop Layton→Kanab repro; the §7 route is bigger), so the *first* Plan sent `routeJson:""` fine, and every *re-Plan* put the whole geometry into the URL. uvicorn's h11 caps the request line at 65536 B → the request died as a raw `400 Bad Request` before FastAPI ran, Datastar got no SSE stream, and **the second Plan click silently did nothing** — no spinner stall, no error, no server-side pipeline involvement. Fix: `routeJson` → `_routeJson` (initial signal in `index.html`, `data-attr:data-route`/`data-show` refs, `SSE.patch_signals` in `app.py`) — the store keeps working, the echo skips it. Regression pins: `test_map_signal_is_excluded_from_request_echo` (all patch-signals keys underscore-prefixed) + the `$_routeJson` template assertion.
+**Rule:** anything the server pushes to the client that the client must never send back (payloads, blobs, geometry) lives in an underscore-prefixed signal.
 
 ## Also non-obvious
 
@@ -66,7 +70,7 @@ data/journey.db  (gitignored, created at startup; 30 d geocode / 7 d OSRM / 3 h 
 
 ## Test map (where the trap regressions live)
 
-- `test_endpoints.py` — SSE frame order `form-errors → patch_signals(routeJson) → #route-result → labels`; asserts `route-map` is **absent** from the fragment and **present** in `/`; `datastar_py` `selector=`/`mode=` framing.
+- `test_endpoints.py` — SSE frame order `form-errors → patch_signals(_routeJson) → #route-result → labels`; asserts `route-map` is **absent** from the fragment and **present** in `/`; `datastar_py` `selector=`/`mode=` framing; Trap 4 pin: every patch-signals key is `_`-prefixed.
 - `test_faults.py` — 503/429/timeout per upstream, chunk-of-10 weather fallback → `None`/`level-nodata`, stale serving, Refresh/stale-badge render.
 - `test_sampling.py` / `test_schedule.py` — the §4.5 math + Kanab→Flagstaff tz case + `6620` split.
 - `test_weather.py` / `test_severity.py` / `test_units.py` — boundaries, null-skip, window indexing, horizon, imperial conversions.

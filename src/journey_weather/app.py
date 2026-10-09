@@ -117,7 +117,7 @@ async def frag_result(request: Request, signals: ReadSignals):
             )
             return
         yield SSE.patch_elements('<div id="form-errors"></div>')
-        yield SSE.patch_signals({"routeJson": result.map_json})
+        yield SSE.patch_signals({"_routeJson": result.map_json})
         yield SSE.patch_elements(_render("_result.html", result=result))
         for n, lat, lon in result.pending_labels:
             label = await labels.reverse_label(cache, lat, lon, refresh=refresh)

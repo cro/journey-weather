@@ -21,7 +21,7 @@ Example trip (§7): Layton, UT → Kanab, UT → Flagstaff, AZ → Phoenix, AZ �
 ### Verified integration facts (probed 2026-10-08)
 
 - **Datastar** runtime: `https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.4/bundles/datastar.js`. The npm package `datastar` is an unrelated SQL library.
-  - Requests: `@get(url)` sends all signals (except `_`-prefixed) as JSON in the `datastar` query parameter. Backend: `from datastar_py.fastapi import datastar_response, read_signals`.
+  - Requests: `@get(url)` sends all signals (except `_`-prefixed) as JSON in the `datastar` query parameter. The bundle's default `filterSignals` is `{include: /.*/, exclude: /(^|\.)_/}` (verified 2026-10-09 in the vendored 1.0.4 bundle): every non-excluded signal is **echoed back on every request**, so large display-only payloads must be `_`-prefixed or they ride the URL (§8). Backend: `from datastar_py.fastapi import datastar_response, read_signals`.
   - Responses: `text/event-stream` carrying `datastar-patch-elements` events, built with `from datastar_py import ServerSentEventGenerator as SSE` → `SSE.patch_elements(html)`. Elements are morphed into the DOM **by element id** (default mode `outer`). Other modes: `inner|replace|prepend|append|before|after|remove`, with `selector`. There is no `data-merge` attribute.
   - Attributes used: `data-signals`, `data-bind`, `data-on`, `data-show`, `data-class`, `data-attr`, `data-indicator`. For web components, `data-bind` (value form) reads/writes the `value` property and listens to `input`/`change`/`datastar-prop-change`. The colon-modifier shorthand (`data-bind:trip.s0.name`) with dotted paths does NOT write back from web components (verified 2026-10-09 in the live browser against 1.0.4) — always use `data-bind="trip.s0.name"`.
 - **Webawesome 3.14.0**: npm tarball `https://registry.npmjs.org/@awesome.me/webawesome/-/webawesome-3.14.0.tgz`. `package/dist-cdn/` contains `webawesome.loader.js` (autoloader; imports relative `chunks/*`), `styles/webawesome.css`, `components/*`. The default `wa-icon` library is remote Font Awesome and is **not used**. Icons use `<wa-icon src="…">` with vendored SVGs.
@@ -46,7 +46,7 @@ Example trip (§7): Layton, UT → Kanab, UT → Flagstaff, AZ → Phoenix, AZ �
 Browser (Jinja HTML + Webawesome + Datastar + <route-map>)
    │  GET /                 full page: form (2 stop rows) + empty #route-result + #form-errors
    │  GET /frag/stop-row    SSE: append one stop row to #stops (reads signals for next index)
-   │  GET /frag/result      SSE: validate → patch #form-errors, or routeJson signal + #route-result, then label patches
+   │  GET /frag/result      SSE: validate → patch #form-errors, or _routeJson signal + #route-result, then label patches
    ▼
 pipeline.plan_trip(signals) — all async, one shared httpx.AsyncClient (timeout 15 s)
    parse_stops → geocode (asyncio.gather) → route (1 OSRM call) → schedule (per-leg departures)
@@ -92,7 +92,7 @@ data/journey.db (gitignored, created on startup)
 
 ### 4.1 Input (signals)
 
-- Initial page signals: `{trip: {s0: {name: '', leave: ''}, s1: {name: '', leave: ''}}, interval: 60, selected: -1, planning: false}`.
+- Initial page signals: `{trip: {s0: {name: '', leave: ''}, s1: {name: '', leave: ''}}, interval: 60, selected: -1, planning: false, _routeJson: ''}`.
 - Each stop row `#stop-{i}` holds:
   - `<wa-input data-bind="trip.s{i}.name" label="Stop {i+1}">`
   - `<wa-input type="datetime-local" data-bind="trip.s{i}.leave" label="Leave at">`
@@ -202,12 +202,12 @@ data/journey.db (gitignored, created on startup)
 - `#stops` (2 rows), then `<wa-button id="add-stop" data-on:click="@get('/frag/stop-row')">Add stop</wa-button>`.
 - Interval control: `<wa-select data-bind="interval">` with options 30/60/90/120 ("Waypoint every … min").
 - Plan button: `<wa-button variant="brand" data-on:click="@get('/frag/result')" data-indicator:planning>Plan</wa-button>`, followed by `<wa-spinner data-show="$planning">`.
-- `<div id="form-errors">`, then the **persistent** `<route-map id="trip-map" data-show="$planning || $routeJson != ''" data-attr:data-route="$routeJson" data-attr:selected="$selected" data-on:row-select="$selected = evt.detail.row" style="height:420px">`, then `<div id="route-result">`. The map element lives OUTSIDE the patched fragment and is fed by the `routeJson` signal (a `datastar-patch-signals` event): Datastar's element morph reuses the old `<route-map>` DOM node and strips Leaflet's own DOM (classes, panes) without re-running `connectedCallback` — a map inside the fragment dies on the second plan (found 2026-10-09).
+- `<div id="form-errors">`, then the **persistent** `<route-map id="trip-map" data-show="$planning || $_routeJson != ''" data-attr:data-route="$_routeJson" data-attr:selected="$selected" data-on:row-select="$selected = evt.detail.row" style="height:420px">`, then `<div id="route-result">`. The map element lives OUTSIDE the patched fragment and is fed by the `_routeJson` signal (a `datastar-patch-signals` event; `_`-prefixed so it is never echoed back in request URLs, §8): Datastar's element morph reuses the old `<route-map>` DOM node and strips Leaflet's own DOM (classes, panes) without re-running `connectedCallback` — a map inside the fragment dies on the second plan (found 2026-10-09).
 
 **Result fragment** (`_result.html`, root `<div id="route-result">`):
 - Status strip: generated time, oldest cache age among responses used (`stale` → amber badge "stale data"), Refresh button `@get('/frag/result?refresh=1')`.
 - Legend: four chips (Clear green, Warning amber, Severe red, No data grey) and the converted thresholds.
-- Map JSON arrives via the `routeJson` signal patch, not the fragment.
+- Map JSON arrives via the `_routeJson` signal patch, not the fragment.
   - JSON shape: `{"pieces":[{"row":int,"level":str,"coords":[[lat,lon],…]}],"stops":[{"row":int,"n":int,"lat":float,"lon":float,"level":str,"title":str}]}`.
 - Itinerary table, one `<tr>` per row:
   - `data-on:click="$selected = {row}"`, `data-class:selected="$selected == {row}"`.
@@ -299,6 +299,7 @@ Layton, UT → Kanab, UT → Flagstaff, AZ → Phoenix, AZ → Tucson, AZ (OSRM,
 - **Webawesome + Datastar ordering (verified 2026-10-09)**: the autoloader defines custom elements *after* Datastar processes the DOM, and `data-bind` reads/writes the `value` property — on an undefined element it binds to nothing, so typed values never reach the signals. `webawesome.js` does not fix this (it only re-exports the loader API). Fix in force: `base.html` imports each used `components/<name>/<name>.js` in a module script that executes before `datastar.js`; SSE-patched rows arrive later and are already upgraded. The colon-modifier bind form (`data-bind:trip.s0.name`) also fails silently on web components with dotted paths — use the value form `data-bind="trip.s0.name"`.
 - **Timezone/DST edges**: all arithmetic in UTC epoch seconds; local times only for display, using `utc_offset_seconds` (weather) and `zoneinfo` (input).
 - **Imperative DOM inside Datastar patches**: any library that injects its own child nodes (Leaflet) must sit in a persistent element outside `datastar-patch-elements` regions; drive it with signals (`data-attr`), never with patched markup.
+- **Signal echo size (found 2026-10-09)**: Datastar puts ALL non-underscore signals in the `datastar` GET query parameter. The map geometry (`_routeJson`, ~94 KB for a 334 mi route) echoed under its un-prefixed name `routeJson` pushed re-Plan request lines past uvicorn's h11 64 KB cap → raw `400 Bad Request`, Datastar renders nothing, second Plan click silently "does nothing". All server→client signals that the client never needs to send are `_`-prefixed.
 
 ## 9. Confirmed decisions
 

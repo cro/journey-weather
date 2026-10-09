@@ -140,11 +140,33 @@ def test_result_streams_result_then_label_patches(client, monkeypatch):
         "datastar-patch-elements", "datastar-patch-elements",
     ]
     assert evs[0]["elements"].strip() == '<div id="form-errors"></div>'
-    assert json.loads(evs[1]["signals"]) == {"routeJson": '{"pieces":[],"stops":[]}'}  # persistent map (§5)
+    assert json.loads(evs[1]["signals"]) == {"_routeJson": '{"pieces":[],"stops":[]}'}  # persistent map (§5)
     assert 'id="route-result"' in evs[2]["elements"]
     assert "near 1.00, 2.00" in evs[2]["elements"]  # fallback labels first (§4.8)
     assert "route-map" not in evs[2]["elements"]  # map lives outside the morph region
     assert evs[3]["elements"] == '<span id="label-1">Ash Fork</span>'
+
+
+def test_map_signal_is_excluded_from_request_echo(client, monkeypatch):
+    """Trap: Datastar @get echoes every non-underscore signal in the `datastar`
+    query param (bundle default filterSignals exclude=/(^|\\.)_/).  The route
+    geometry is ~94 KB for a 334 mi route; echoed, it pushes re-Plan request
+    lines past uvicorn's 64 KB h11 cap → silent 400, second Plan "does nothing".
+    So the map payload must arrive only via a patch-signals event whose keys
+    are all underscore-prefixed."""
+    async def fake_plan(cache, signals, *, refresh=False):
+        return _mini_result()
+
+    async def fake_label(cache, lat, lon, *, refresh=False):
+        return "Ash Fork"
+
+    monkeypatch.setattr(pipeline, "plan_trip", fake_plan)
+    monkeypatch.setattr(labels, "reverse_label", fake_label)
+    evs = events_of(client.get("/frag/result" + ds({}), headers=DS_HEADER).text)
+    patched = [json.loads(e["signals"]) for e in evs if "signals" in e]
+    assert any("_routeJson" in p for p in patched)
+    for p in patched:
+        assert all(k.startswith("_") for k in p)
 
 
 def test_result_escapes_label_html(client, monkeypatch):
@@ -164,6 +186,6 @@ def test_result_escapes_label_html(client, monkeypatch):
 def test_index_page_has_form_containers(client):
     body = client.get("/").text
     for needle in ('id="stops"', 'id="form-errors"', 'id="route-result"',
-                   '<route-map id="trip-map"', 'data-attr:data-route="$routeJson"',
+                   '<route-map id="trip-map"', 'data-attr:data-route="$_routeJson"',
                    'data-bind="trip.s0.name"', 'data-bind="interval"', "data-indicator:planning"):
         assert needle in body
