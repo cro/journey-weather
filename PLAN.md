@@ -267,9 +267,9 @@ Badges use `wind` (wind rule) and `eye-off` (visibility).
    - *Verify:* pytest — each rule in isolation at warning/severe boundaries; null-input skip; window indexing; horizon pre-check; unit conversions. A live smoke script prints the §7 itinerary table.
 5. **Endpoints** — DONE 2026-10-09 (`selector=`/`mode=` confirmed in installed source; curl -N shows `#route-result` then 15 `#label-*` patch events)
    - *Verify:* `curl -N 'http://127.0.0.1:8000/frag/result?datastar=<urlencoded signals JSON>'` shows a `datastar-patch-elements` event for `#route-result`, then `#label-*` events.
-6. **UI**: templates, `route-map.js`, CSS.
+6. **UI** — DONE 2026-10-09 (`a80123c`; scripted browser: idle/loading/result+selection/validation/horizon screenshots)
    - *Verify:* scripted browser session on the real page: enter the §7 trip, click Plan, see the spinner, then the map with colored pieces and 5 markers; clicking a row highlights the piece and shows the detail; screenshots for the idle, loading, result, validation-error, and horizon-error states.
-7. **Hardening**: retry/backoff paths, `nodata` rows, stale-cache badge, Add stop at 12 disabled.
+7. **Hardening** — DONE 2026-10-09: per-upstream fault injection (`tests/test_faults.py`), stale badge, `level-nodata` rendering, Add stop disabled at 12 (`tests/test_endpoints.py`); 110 tests
    - *Verify:* fault-injection tests (mock transport returning 500/429/timeout) for each upstream.
 
 ## 7. Worked example
