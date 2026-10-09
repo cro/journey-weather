@@ -84,3 +84,14 @@ No accounts, no saved/shared routes, no live traffic, no stop reordering/removal
 
 - Nothing blocking. If the Webawesome autoloader assumption is ever revisited, Trap 1 is the constraint.
 - Consider a client-side assertion that `customElements.get('wa-input')` is truthy before Datastar boots, to fail loudly if the eager-import ordering in `base.html` is ever broken.
+
+## Session log — 2026-10-09 (second Plan click silently did nothing)
+
+Reported: after a successful Plan, editing stop 1's Leave-at and clicking Plan again produced no visible response.
+
+- Reproduced the failure mechanism: live browser E2E (page loads clean, zero 404s, but the `@get` payload grows) + raw-socket replay. The second click's `datastar` query param is 128 KB because the route geometry (~94 KB for Layton→Kanab, 2 stops) lives in the `routeJson` signal and Datastar echoes every non-underscore signal into the GET URL. uvicorn's h11 caps the request line at 65536 B → raw `400 Bad Request` before FastAPI; no SSE, no UI change, no pipeline error. The server-side pipeline itself was proven healthy (curl with the same signals → full result + label patches).
+- Fix (`d69f7b9`): renamed the signal to `_routeJson` — excluded from the echo, unchanged as client store. Touched `templates/index.html` (initial signals, `data-show`, `data-attr:data-route`) and `app.py` (`SSE.patch_signals`). The Refresh button path (`/frag/result?refresh=1`) was equally affected and is fixed by the same rename.
+- Tests: new `test_map_signal_is_excluded_from_request_echo` (asserts every patch-signals key is `_`-prefixed — fails on the old `routeJson` name); updated the two existing pins in `test_endpoints.py`. 110 → **111 passing**.
+- Verified end-to-end in a live browser: typed trip → Plan (200, 304-char URL) → edited Leave-at 07:00→09:00 → Plan again (200, 304-char URL): itinerary updated (row 0 = 09:00, Kanab arrival 15:03), Leaflet map still alive (7 panes, `data-route` = the new 93 KB geometry), `#form-errors` empty; screenshot captured.
+- Docs (`d69f7b9` + `67ae812` + this): PLAN.md §2 now records the bundle default `filterSignals {include: /.*/, exclude: /(^|\.)_/}`; §4.1 initial signals and §5 map refs updated; new §8 watch-out. STATUS.md gained Trap 4 ("four integration traps"), Trap 3 and the test map renamed accordingly, milestone table gained the re-Plan row.
+- Environment: `journey-dev` was found down; restarted with the absolute uv path (PATH quirk, "Also non-obvious") — running on `0.0.0.0:8000` with the fix. Browser tabs from this investigation were closed; no scratch files to clean up.
