@@ -1,0 +1,27 @@
+[project]
+name = "journey-weather"
+version = "0.1.0"
+description = "Road-trip weather planner: forecast along your route at every stop and waypoint"
+readme = "README.md"
+authors = [
+    { name = "C. R. Oldham", email = "cro@ncbt.org" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "datastar-py>=1.0.3",
+    "fastapi>=0.143.0",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]
