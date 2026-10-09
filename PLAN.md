@@ -4,8 +4,8 @@ Road-trip weather planner: enter the cities you'll drive through, when you leave
 
 ## 1. What it does (v1)
 
-1. Enter the trip as an ordered list of stops, one form row per stop: city name plus a "leave at" date/time. The origin's leave-at is required. Later stops' leave-at is optional (blank = keep driving on arrival). The final stop's leave-at is ignored.
-2. Backend: geocodes each stop, routes the whole trip with one OSRM request, places a waypoint every `interval` minutes of driving (default 60), computes each point's arrival instant, fetches the hourly forecast for all points in one Open-Meteo request, applies severity rules, and caches every upstream response.
+1. Enter the trip as an ordered list of stops, one form row per stop: city name, a "leave at" date/time, and an optional **dwell time** (minutes stopped there — gas, a walk, lunch). The origin's leave-at is required. Later stops' leave-at is optional (blank = keep driving, except any dwell is still honored). The final stop's leave-at and dwell are ignored.
+2. Backend: geocodes each stop, routes the whole trip with one OSRM request, places a waypoint every `interval` minutes of driving (default 60), computes each point's arrival instant (every stop's dwell delays all later arrivals and changes the forecast hours you drive into), fetches the hourly forecast for all points in one Open-Meteo request, applies severity rules, and caches every upstream response.
 3. UI: Leaflet map with route pieces colored by severity and numbered stop markers; severity legend; itinerary table (stops interleaved with waypoints). Clicking a table row or map piece opens that row's detail panel. Display units are imperial (°F, mph, in, mi).
 4. Each stop row echoes the resolved place ("Kanab, Utah, US"). A stop entered as `Name;lat;lon` skips geocoding.
 
@@ -92,10 +92,11 @@ data/journey.db (gitignored, created on startup)
 
 ### 4.1 Input (signals)
 
-- Initial page signals: `{trip: {s0: {name: '', leave: ''}, s1: {name: '', leave: ''}}, interval: 60, selected: -1, planning: false, _routeJson: ''}`.
+- Initial page signals: `{trip: {s0: {name: '', leave: '', dwell: ''}, s1: {name: '', leave: '', dwell: ''}}, interval: 60, selected: -1, planning: false, _routeJson: ''}`.
 - Each stop row `#stop-{i}` holds:
   - `<wa-input data-bind="trip.s{i}.name" label="Stop {i+1}">`
   - `<wa-input type="datetime-local" data-bind="trip.s{i}.leave" label="Leave at">`
+  - `<wa-input type="number" min="0" max="1440" step="1" data-bind="trip.s{i}.dwell" label="Dwell (min)">` (blank = 0)
 - `/frag/stop-row`:
   - next index = number of keys in `trip`; patches a new row with `selector="#stops"`, `mode="append"`.
   - When the count reaches `MAX_STOPS` (12), it also patches the `#add-stop` button with `disabled`.
@@ -108,6 +109,7 @@ data/journey.db (gitignored, created on startup)
   - `Stop {n}: coordinates out of range.`
   - `Stop 1 needs a leave-at time.`
   - `Stop {n}: leave time {hh:mm} is before arrival {hh:mm}.`
+  - `Stop {n}: dwell must be a whole number of minutes from 0 to 1440.`
   - `No drivable route between stop {n} and stop {n+1}.`
   - `Trip extends past the 16-day forecast horizon (latest plannable: {date time tz}).`
 - A successful plan patches `#form-errors` empty.
@@ -129,8 +131,9 @@ data/journey.db (gitignored, created on startup)
 ### 4.4 Schedule (per-leg departures)
 
 - Each `leave` string (`YYYY-MM-DDTHH:MM`) is interpreted in **that stop's** tz with `zoneinfo.ZoneInfo(tz)` and converted to UTC.
+- Dwell `dwell_k` (minutes at stop k, 0–1440; §10.1) applies to mid-route stops only: the origin's leave-at already fixes its departure and the final stop has no onward driving, so their dwell is ignored like the final leave-at.
 - Leg 0 starts at stop 0's leave time.
-- Leg k > 0 starts at stop k's leave time if set, else at stop k's arrival. A leave time earlier than the arrival is a validation error.
+- Leg k > 0 starts at `max(arrival + dwell_k·60 s, stop k's leave time if set)` — dwell is the minimum time spent at the stop; an explicit leave-at later than that wins, one inside it is overridden by the dwell (not an error). A leave time earlier than the *arrival* is a validation error.
 - `arrive(stop k+1) = start(leg k) + leg_duration_s`.
 - The UI labels every time "static speeds, no traffic".
 
@@ -142,7 +145,7 @@ data/journey.db (gitignored, created on startup)
 - Rows, in order: stop 0, waypoints of leg 0, stop 1, waypoints of leg 1, …, last stop.
   - Stop 0's weather instant = its leave time.
   - Stop k > 0's weather instant = its arrival.
-  - Stop rows show arrival and (if set) leave times.
+  - Stop rows show arrival, the effective leave (only when the car actually rests there: dwell or a later leave-at), and `"{dwell} min stop"` when dwell > 0.
 
 ### 4.6 Weather
 
@@ -303,8 +306,20 @@ Layton, UT → Kanab, UT → Flagstaff, AZ → Phoenix, AZ → Tucson, AZ (OSRM,
 ## 9. Confirmed decisions
 
 - Hard 16-day forecast limit; no climate fallback.
-- Route = ordered stop rows (city name or `Name;lat;lon`), each with an optional leave-at; no presets.
+- Route = ordered stop rows (city name or `Name;lat;lon`), each with an optional leave-at and an optional dwell (0–1440 min, mid-route only; dwell = minimum stay, a later explicit leave-at wins); no presets.
 - Weather at each point's arrival hour; the flag is the worst value in the [−1 h, +2 h] window.
 - Severity thresholds baked in; display units imperial.
 - Leaflet + OSM tiles via one `<route-map>` custom element; all other interactivity is Datastar attributes and server-rendered fragments.
 - SQLite HTTP cache only; no accounts, no saved or shared routes, no live traffic, no stop reordering or removal UI (blank rows are ignored).
+
+## 10. Feature Enhancements 
+- [x] Add a field next to each stop line for dwell time, in other words, say I'm
+going from Layton, UT to Boise, ID and I'm going to stop in Garden City for gas
+and a walk that should take a total of 35 minutes.  Factor the dwell time into
+the path and weather forecasts.  DONE 2026-10-09 — `trip.s{i}.dwell` (0–1440 min,
+mid-route stops; departure = max(arrival + dwell, leave-at)) shifts every later
+arrival, waypoint instant, and therefore the forecast hour fetched for each row.
+- [ ] The layout for each stop line is kind of wonky.  Can you line it up better
+and use a smaller font for the field captions.  Also alternate the stop line
+backgrounds between light gray and white to make them easier to read.
+

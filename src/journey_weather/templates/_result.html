@@ -36,6 +36,7 @@
         <td>
           {{ row.local_time }}
           {% if row.local_leave %}<div class="leave">leave {{ row.local_leave }}</div>{% endif %}
+          {% if row.dwell_min %}<div class="leave">{{ row.dwell_min }} min stop</div>{% endif %}
         </td>
         <td>{% if row.icon %}<wa-icon src="/static/vendor/icons/{{ row.icon }}.svg" label="{{ row.icon }}"></wa-icon>{% endif %}</td>
         <td>{{ row.temp_f if row.temp_f is not none else "—" }}</td>

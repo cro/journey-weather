@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
-from . import geocode, routing, sampling, schedule as sched_mod, severity, weather
+from . import config, geocode, routing, sampling, schedule as sched_mod, severity, weather
 from .cache import Cache, CacheHit, UpstreamError
 from .units import c_to_f, kmh_to_mph, m_to_mi, mmh_to_inh
 
@@ -46,6 +46,7 @@ class Row:
     sentences: list[str] = field(default_factory=list)  # triggered-rule sentences
     leg_mi: int | None = None  # distance of the leg arriving at this row
     drive_str: str | None = None  # drive time into this row
+    dwell_min: int | None = None  # stop rows: minutes stopped here before continuing
 
 
 @dataclass
@@ -60,8 +61,10 @@ class TripResult:
     pending_labels: list[tuple[int, float, float]] = field(default_factory=list)
 
 
-def parse_signals(signals: dict) -> tuple[list[tuple[str, str]], int]:
-    """trip.{sN}.{name,leave} rows ordered by N, blank names skipped (§4.1)."""
+def parse_signals(signals: dict) -> tuple[list[tuple[str, str, str]], int]:
+    """trip.{sN}.{name,leave,dwell} rows ordered by N, blank names skipped (§4.1).
+
+    `dwell` is the raw string from the form; "" = unset. Validated in plan_trip."""
     trip = signals.get("trip") or {}
     numbered: list[tuple[int, dict]] = []
     for key, val in trip.items():
@@ -69,10 +72,14 @@ def parse_signals(signals: dict) -> tuple[list[tuple[str, str]], int]:
             numbered.append((int(key[1:]), val))
     numbered.sort(key=lambda kv: kv[0])
     rows = [
-        ((v.get("name") or "").strip(), (v.get("leave") or "").strip())
+        (
+            (v.get("name") or "").strip(),
+            (v.get("leave") or "").strip(),
+            str(v.get("dwell") or "").strip(),
+        )
         for _, v in numbered
     ]
-    rows = [(n, lv) for n, lv in rows if n]
+    rows = [(n, lv, dw) for n, lv, dw in rows if n]
     try:
         interval = int(float(signals.get("interval") or 60))
     except (TypeError, ValueError):
@@ -128,8 +135,27 @@ async def plan_trip(cache: Cache, raw_signals: dict, *, refresh: bool = False) -
     if not trip[0][1]:
         raise TripInputError(["Stop 1 needs a leave-at time."])
 
-    # Geocode concurrently (§4.2 step 6), collecting all failures (§4.1).
+    # Dwell (PLAN.md §4.1): minutes stopped at each stop before continuing;
+    # "" = 0. Mid-route only — origin/final dwell is ignored by the schedule.
     errors: list[str] = []
+    dwells: list[int] = []
+    for i, (_, _, dwell_raw) in enumerate(trip):
+        dwell = 0
+        if dwell_raw:
+            try:
+                parsed = int(dwell_raw)
+            except ValueError:
+                parsed = -1
+            if 0 <= parsed <= config.MAX_DWELL_MIN:
+                dwell = parsed
+            else:
+                errors.append(
+                    f"Stop {i + 1}: dwell must be a whole number of minutes "
+                    f"from 0 to {config.MAX_DWELL_MIN}."
+                )
+        dwells.append(dwell)
+
+    # Geocode concurrently (§4.2 step 6), collecting all failures (§4.1).
 
     async def resolve(i: int, name: str) -> geocode.Stop | None:
         try:
@@ -140,7 +166,7 @@ async def plan_trip(cache: Cache, raw_signals: dict, *, refresh: bool = False) -
             errors.append(f"Stop {i + 1}: coordinates out of range.")
         return None
 
-    stops_t = await asyncio.gather(*(resolve(i, n) for i, (n, _) in enumerate(trip)))
+    stops_t = await asyncio.gather(*(resolve(i, n) for i, (n, _, _) in enumerate(trip)))
     if errors:
         raise TripInputError(errors)
     stops: list[geocode.Stop] = [s for s in stops_t if s is not None]
@@ -159,7 +185,10 @@ async def plan_trip(cache: Cache, raw_signals: dict, *, refresh: bool = False) -
 
     # Schedule (§4.4); leave-before-arrival is a validation error.
     plan = sched_mod.plan_schedule(
-        [s.tz for s in stops], [lv for _, lv in trip], [leg.leg_duration_s for leg in legs]
+        [s.tz for s in stops],
+        [lv for _, lv, _ in trip],
+        [leg.leg_duration_s for leg in legs],
+        dwells,
     )
     if plan.errors:
         raise TripInputError(
@@ -217,14 +246,16 @@ async def plan_trip(cache: Cache, raw_signals: dict, *, refresh: bool = False) -
             next_stop += 1
             stop_idx_of_row[n] = si
             st = plan.stops[si]
+            mid = 0 < si < len(plan.stops) - 1
             row = Row(
                 n=n, kind="stop", place=stops[si].display, label_id=None,
                 epoch=epoch, local_time=_fmt(epoch, tzname),
                 local_leave=(
-                    _fmt(st.leave_epoch, tzname)
-                    if 0 < si < len(plan.stops) - 1 and st.leave_epoch is not None
+                    _fmt(st.departure_epoch, tzname)
+                    if mid and st.departure_epoch > st.arrival_epoch
                     else None
                 ),
+                dwell_min=st.dwell_min if mid and st.dwell_min else None,
                 leg_mi=int(legs[si - 1].leg_distance_m / 1609.344) if si else None,
                 drive_str=_drive_str(legs[si - 1].leg_duration_s) if si else None,
                 temp_f=None, feels_f=None, precip_in=None, precip_prob=None,

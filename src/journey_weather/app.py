@@ -59,6 +59,8 @@ jinja_env = Environment(
 jinja_env.filters["humandur"] = _humandur
 jinja_env.filters["utc"] = _utc
 
+jinja_env.globals["MAX_DWELL_MIN"] = config.MAX_DWELL_MIN
+
 
 def _render(name: str, **ctx) -> str:
     return jinja_env.get_template(name).render(**ctx)

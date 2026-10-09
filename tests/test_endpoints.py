@@ -60,6 +60,7 @@ def test_stop_row_appends_with_selector_and_mode(client):
     assert len(evs) == 1
     ev = evs[0]
     assert 'id="stop-2"' in ev["elements"] and 'data-bind="trip.s2.name"' in ev["elements"]
+    assert 'data-bind="trip.s2.dwell"' in ev["elements"]  # dwell field ships with each row
     assert ev["mode"] == "append" and ev["selector"] == "#stops"
 
 
@@ -189,7 +190,7 @@ def test_index_page_has_form_containers(client):
     body = client.get("/").text
     for needle in ('id="stops"', 'id="form-errors"', 'id="route-result"',
                    '<route-map id="trip-map"', 'data-attr:data-route="$_routeJson"',
-                   'data-bind="trip.s0.name"', 'data-bind="interval"', "data-indicator:planning"):
+                   'data-bind="trip.s0.name"', 'data-bind="trip.s0.dwell"', 'data-bind="interval"', "data-indicator:planning"):
         assert needle in body
 
 

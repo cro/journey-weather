@@ -6,6 +6,8 @@ from pathlib import Path
 USER_AGENT = "journey-weather/0.1"
 
 MAX_STOPS = 12
+# Upper bound for a stop's dwell time, minutes (PLAN.md §4.1).
+MAX_DWELL_MIN = 1440
 
 # Cache database (created on startup; gitignored).
 ROOT = Path(__file__).resolve().parents[2]

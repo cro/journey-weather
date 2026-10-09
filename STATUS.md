@@ -4,7 +4,7 @@ Road-trip weather planner. Design & rationale live in **[PLAN.md](PLAN.md)** —
 
 ## Where it stands (2026-10-09)
 
-**All 7 milestones complete and verified.** Latest change: the Trap 1 boot assertion — `base.html` now *proves* Webawesome registration before loading Datastar (`await import`), closing the last follow-up item; 112 tests pass (`uv run pytest -q`, ~1 s). Earlier fixes `d69f7b9` (Trap 4) re-verified in the same live browser run: Plan → edit Leave-at → Plan updates table/map. Dev server runs as the `journey-dev` service on `0.0.0.0:8000` (LAN-reachable; `curl localhost:8000/healthz` → `{"ok":true}`). Live browser E2E done end-to-end: idle, loading, result + map, row selection, validation error, horizon error, repeat-planning.
+**All 7 milestones complete and verified. §10.1 dwell time shipped 2026-10-09** (see session log at the bottom). Latest change: the Trap 1 boot assertion — `base.html` now *proves* Webawesome registration before loading Datastar (`await import`), closing the last follow-up item; 127 tests pass (`uv run pytest -q`, ~1 s). Earlier fixes `d69f7b9` (Trap 4) re-verified in the same live browser run: Plan → edit Leave-at → Plan updates table/map. Dev server runs as the `journey-dev` service on `0.0.0.0:8000` (LAN-reachable; `curl localhost:8000/healthz` → `{"ok":true}`). Live browser E2E done end-to-end: idle, loading, result + map, row selection, validation error, horizon error, repeat-planning.
 
 | Milestone | Commit | What |
 |---|---|---|
@@ -17,6 +17,7 @@ Road-trip weather planner. Design & rationale live in **[PLAN.md](PLAN.md)** —
 | 7 Hardening | `555085d` | fault-injection, stale/nodata, add-stop limit |
 | — map fix | `4051ab9` | map survived only one plan — see Trap 3 |
 | — re-Plan fix | `d69f7b9` | second Plan silently no-op'd — see Trap 4 |
+| — dwell time | — | §10.1: per-stop dwell shifts later arrivals + forecast hours (this session) |
 
 ## The four integration traps (each cost real debugging; do not regress)
 
@@ -67,13 +68,14 @@ data/journey.db  (gitignored, created at startup; 30 d geocode / 7 d OSRM / 3 h 
 - Run: `uv run uvicorn journey_weather.app:app --reload --host 0.0.0.0 --port 8000`
 - Refresh vendored assets (rare; they are committed): `uv run scripts/vendor.sh`
 - Live smoke (hits real upstreams, uses `data/journey.db`): `uv run scripts/smoke_milestone2.py` / `smoke_milestone4.py`
-- Tests: `uv run pytest -q` → 112. `tests/conftest.py` has `mock_client(routes)` + the `cache`/`no_sleep` fixtures; pure modules are unit-tested, I/O tested against recorded fixtures + synthetic fault handlers.
+- Tests: `uv run pytest -q` → 127. `tests/conftest.py` has `mock_client(routes)` + the `cache`/`no_sleep` fixtures; pure modules are unit-tested, I/O tested against recorded fixtures + synthetic fault handlers.
 
 ## Test map (where the trap regressions live)
 
 - `test_endpoints.py` — SSE frame order `form-errors → patch_signals(_routeJson) → #route-result → labels`; asserts `route-map` is **absent** from the fragment and **present** in `/`; `datastar_py` `selector=`/`mode=` framing; Trap 4 pin: every patch-signals key is `_`-prefixed; Trap 1 pin: Datastar boots only behind the registration guard, and every `<wa-*>` tag in the templates is in the guarded set.
 - `test_faults.py` — 503/429/timeout per upstream, chunk-of-10 weather fallback → `None`/`level-nodata`, stale serving, Refresh/stale-badge render.
-- `test_sampling.py` / `test_schedule.py` — the §4.5 math + Kanab→Flagstaff tz case + `6620` split.
+- `test_schedule.py` — the §4.4 math + Kanab→Flagstaff tz case + `6620` split + the five dwell cases (§10.1: shift, leave-wins, dwell-wins, bounds, origin/final ignored).
+- `test_pipeline.py` — dwell end-to-end over the §7 fixtures: `trip_cache` answers geocoding + OSRM fixtures and a past-hours synthetic forecast (all rows nodata → pure schedule assertions); pins parse/validation (0–1440) and that a mid-route 35-min dwell shifts every later arrival exactly. Its `POINTS` are **derived from the geocoding fixtures** — the live-API coords drift from the recorded ones, and a hand-typed OSRM URL 404s the mock.
 - `test_weather.py` / `test_severity.py` / `test_units.py` — boundaries, null-skip, window indexing, horizon, imperial conversions.
 
 ## Intentional non-goals (v1, per PLAN.md §9)
@@ -101,3 +103,9 @@ Reported: after a successful Plan, editing stop 1's Leave-at and clicking Plan a
 - New pin `test_datastar_loads_only_behind_the_registration_guard` (111 → 112): no datastar script tag in `<head>`; exactly one inline module script; import set == guarded set; throw-before-`await import`; every `<wa-*>` tag across the templates ⊆ guarded set.
 - Live browser re-verified (fresh tab on `journey-dev`): all 8 `wa-*` registered, `datastar.js` fetched exactly once, zero console errors, zero 4xx/5xx. Typed Layton→Kanab + Leave-at `2026-10-10T09:00` → Plan: signals echoed with typed values (Trap 1/2 binding proven over the wire), 20-row table (256 cells), 93 KB `_routeJson` into the persistent map, Leaflet panes + tiles alive, 304-char request URL (Trap 4 intact); re-Plan again clean. Screenshot reviewed.
 - Negative path (guard missing → throw → Datastar never loads) is guaranteed by module semantics (top-level throw aborts before the dynamic import) and pinned statically; could not exercise it live because the harness's `tab.route` respond-override silently no-ops (reported upstream).
+
+## Session log — 2026-10-09 (§10.1 dwell time)
+
+Added per-stop dwell (`trip.s{i}.dwell`, minutes): validated in `pipeline.plan_trip` (0–1440 whole minutes, message in §4.1), applied in `schedule.plan_schedule` as a minimum stay at mid-route stops — departure = max(arrival + dwell, explicit leave-at); origin/final dwell ignored like the final leave-at. Everything downstream (waypoint instants, weather hour index, horizon check, map) reads the schedule, so dwell automatically factors into the forecast without touching sampling/weather/severity. Result rows show `leave …` (effective departure, now shown whenever the car rests) + `N min stop` (`Row.dwell_min`). Templates: third `wa-input type=number` per stop row + `dwell` in page/row signals (small strings — no Trap 4 risk). 112 → 127 tests.
+
+Verified live: server A/B (curl SSE, Datastar-Request header) Layton→Kanab→Flagstaff with/without 35 min at Kanab — Kanab arrival unchanged 13:02, row shows leave 13:37 + "35 min stop", Flagstaff 16:16→16:51, 22 of 65 rows' weather changed (all at/after the dwell); origin dwell and final dwell ignored. Browser: dwell field renders on each row, typed 35 → full plan updates; invalid dwell → `#form-errors` callout. `journey-dev` was down again at session start; restarted with the absolute uv path.

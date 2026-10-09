@@ -1,7 +1,9 @@
 <div id="stop-{{ i }}" class="stop-row"
-     data-signals='{"trip":{"s{{ i }}":{"name":"","leave":""}}}'>
+     data-signals='{"trip":{"s{{ i }}":{"name":"","leave":"","dwell":""}}}'>
   <wa-input data-bind="trip.s{{ i }}.name" label="Stop {{ i + 1 }}"
             placeholder="City, ST or Name;lat;lon"></wa-input>
   <wa-input type="datetime-local" data-bind="trip.s{{ i }}.leave"
             label="Leave at"{% if i == 0 %} hint="required"{% endif %}></wa-input>
+  <wa-input type="number" min="0" max="{{ MAX_DWELL_MIN }}" step="1"
+            data-bind="trip.s{{ i }}.dwell" label="Dwell (min)"></wa-input>
 </div>
