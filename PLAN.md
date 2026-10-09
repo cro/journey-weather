@@ -23,7 +23,7 @@ Example trip (§7): Layton, UT → Kanab, UT → Flagstaff, AZ → Phoenix, AZ �
 - **Datastar** runtime: `https://cdn.jsdelivr.net/gh/starfederation/datastar@v1.0.4/bundles/datastar.js`. The npm package `datastar` is an unrelated SQL library.
   - Requests: `@get(url)` sends all signals (except `_`-prefixed) as JSON in the `datastar` query parameter. Backend: `from datastar_py.fastapi import datastar_response, read_signals`.
   - Responses: `text/event-stream` carrying `datastar-patch-elements` events, built with `from datastar_py import ServerSentEventGenerator as SSE` → `SSE.patch_elements(html)`. Elements are morphed into the DOM **by element id** (default mode `outer`). Other modes: `inner|replace|prepend|append|before|after|remove`, with `selector`. There is no `data-merge` attribute.
-  - Attributes used: `data-signals`, `data-bind` (works on custom elements: binds `value`, listens to `change`), `data-on`, `data-show`, `data-class`, `data-attr`, `data-indicator`. Nested signals use dot notation: `data-bind:trip.s0.name`.
+  - Attributes used: `data-signals`, `data-bind`, `data-on`, `data-show`, `data-class`, `data-attr`, `data-indicator`. For web components, `data-bind` (value form) reads/writes the `value` property and listens to `input`/`change`/`datastar-prop-change`. The colon-modifier shorthand (`data-bind:trip.s0.name`) with dotted paths does NOT write back from web components (verified 2026-10-09 in the live browser against 1.0.4) — always use `data-bind="trip.s0.name"`.
 - **Webawesome 3.14.0**: npm tarball `https://registry.npmjs.org/@awesome.me/webawesome/-/webawesome-3.14.0.tgz`. `package/dist-cdn/` contains `webawesome.loader.js` (autoloader; imports relative `chunks/*`), `styles/webawesome.css`, `components/*`. The default `wa-icon` library is remote Font Awesome and is **not used**. Icons use `<wa-icon src="…">` with vendored SVGs.
 - **lucide-static 1.53.0** (ISC): `icons/{sun,cloud-sun,cloud,cloud-fog,cloud-drizzle,cloud-rain,cloud-snow,cloud-lightning,wind,eye-off}.svg` all exist.
 - **OSRM demo** `https://router.project-osrm.org/route/v1/driving/{lon,lat;…}?overview=full&geometries=geojson&annotations=duration,distance`:
@@ -94,8 +94,8 @@ data/journey.db (gitignored, created on startup)
 
 - Initial page signals: `{trip: {s0: {name: '', leave: ''}, s1: {name: '', leave: ''}}, interval: 60, selected: -1, planning: false}`.
 - Each stop row `#stop-{i}` holds:
-  - `<wa-input data-bind:trip.s{i}.name label="Stop {i+1}">`
-  - `<wa-input type="datetime-local" data-bind:trip.s{i}.leave label="Leave at">`
+  - `<wa-input data-bind="trip.s{i}.name" label="Stop {i+1}">`
+  - `<wa-input type="datetime-local" data-bind="trip.s{i}.leave" label="Leave at">`
 - `/frag/stop-row`:
   - next index = number of keys in `trip`; patches a new row with `selector="#stops"`, `mode="append"`.
   - When the count reaches `MAX_STOPS` (12), it also patches the `#add-stop` button with `disabled`.
@@ -192,7 +192,7 @@ data/journey.db (gitignored, created on startup)
 
 **`base.html`** loads, all from `/static/vendor/`:
 - `webawesome/styles/webawesome.css`
-- `<script type="module" src="…/webawesome/webawesome.loader.js">`
+- `<script type="module">` importing the eight used components directly (`…/webawesome/components/{button,input,select,spinner,badge,callout,icon,tooltip}/*.js`) — registration must precede Datastar (see §8)
 - `<script type="module" src="…/datastar/datastar.js">`
 - `leaflet/leaflet.css`
 - `leaflet/leaflet.js`
@@ -200,7 +200,7 @@ data/journey.db (gitignored, created on startup)
 
 **Form** (`index.html`):
 - `#stops` (2 rows), then `<wa-button id="add-stop" data-on:click="@get('/frag/stop-row')">Add stop</wa-button>`.
-- Interval control: `<wa-select data-bind:interval>` with options 30/60/90/120 ("Waypoint every … min").
+- Interval control: `<wa-select data-bind="interval">` with options 30/60/90/120 ("Waypoint every … min").
 - Plan button: `<wa-button variant="brand" data-on:click="@get('/frag/result')" data-indicator:planning>Plan</wa-button>`, followed by `<wa-spinner data-show="$planning">`.
 - `<div id="form-errors">`, `<div id="route-result">`.
 
@@ -296,7 +296,7 @@ Layton, UT → Kanab, UT → Flagstaff, AZ → Phoenix, AZ → Tucson, AZ (OSRM,
 - **Nominatim policy**: 1 req/s and identifying User-Agent are mandatory; enforced in `labels.py`. Labels are cosmetic, so their failure never fails a plan.
 - **OSM tile policy**: low-volume interactive use with attribution is fine; heavy use would need a tile provider.
 - **ETA accuracy**: no traffic or live speeds; stated in the UI.
-- **Webawesome autoloader**: assumed to discover `wa-*` elements inserted by Datastar patches. If patched elements stay undefined (no `:defined` styling), switch `base.html` to import `webawesome.js` (registers every component) instead of the loader.
+- **Webawesome + Datastar ordering (verified 2026-10-09)**: the autoloader defines custom elements *after* Datastar processes the DOM, and `data-bind` reads/writes the `value` property — on an undefined element it binds to nothing, so typed values never reach the signals. `webawesome.js` does not fix this (it only re-exports the loader API). Fix in force: `base.html` imports each used `components/<name>/<name>.js` in a module script that executes before `datastar.js`; SSE-patched rows arrive later and are already upgraded. The colon-modifier bind form (`data-bind:trip.s0.name`) also fails silently on web components with dotted paths — use the value form `data-bind="trip.s0.name"`.
 - **Timezone/DST edges**: all arithmetic in UTC epoch seconds; local times only for display, using `utc_offset_seconds` (weather) and `zoneinfo` (input).
 
 ## 9. Confirmed decisions

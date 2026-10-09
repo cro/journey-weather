@@ -1,6 +1,7 @@
-<div id="stop-{{ i }}" class="stop-row">
-  <wa-input data-bind:trip.s{{ i }}.name label="Stop {{ i + 1 }}"
+<div id="stop-{{ i }}" class="stop-row"
+     data-signals='{"trip":{"s{{ i }}":{"name":"","leave":""}}}'>
+  <wa-input data-bind="trip.s{{ i }}.name" label="Stop {{ i + 1 }}"
             placeholder="City, ST or Name;lat;lon"></wa-input>
-  <wa-input type="datetime-local" data-bind:trip.s{{ i }}.leave
+  <wa-input type="datetime-local" data-bind="trip.s{{ i }}.leave"
             label="Leave at"{% if i == 0 %} hint="required"{% endif %}></wa-input>
 </div>

@@ -57,9 +57,8 @@ def test_stop_row_appends_with_selector_and_mode(client):
     )
     assert len(evs) == 1
     ev = evs[0]
-    assert ev["type"] == "datastar-patch-elements"
+    assert 'id="stop-2"' in ev["elements"] and 'data-bind="trip.s2.name"' in ev["elements"]
     assert ev["mode"] == "append" and ev["selector"] == "#stops"
-    assert 'id="stop-2"' in ev["elements"] and "data-bind:trip.s2.name" in ev["elements"]
 
 
 def test_stop_row_disables_at_max(client):
@@ -161,5 +160,5 @@ def test_result_escapes_label_html(client, monkeypatch):
 def test_index_page_has_form_containers(client):
     body = client.get("/").text
     for needle in ('id="stops"', 'id="form-errors"', 'id="route-result"',
-                   "trip.s0.name", "data-bind:interval", "data-indicator:planning"):
+                   'data-bind="trip.s0.name"', 'data-bind="interval"', "data-indicator:planning"):
         assert needle in body
