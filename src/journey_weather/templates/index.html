@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block body %}
-<main class="page" data-signals='{"trip":{"s0":{"name":"","leave":""},"s1":{"name":"","leave":""}},"interval":"60","selected":-1,"planning":false}'>
+<main class="page" data-signals='{"trip":{"s0":{"name":"","leave":""},"s1":{"name":"","leave":""}},"interval":"60","selected":-1,"planning":false,"routeJson":""}'>
   <h1>Journey Weather</h1>
   <p class="sub">Forecast along your route, at every stop and waypoint in between.</p>
 
@@ -22,6 +22,9 @@
   </div>
 
   <div id="form-errors"></div>
+  <route-map id="trip-map" data-show="$planning || $routeJson != ''"
+             data-attr:data-route="$routeJson" data-attr:selected="$selected"
+             data-on:row-select="$selected = evt.detail.row" style="height:420px"></route-map>
   <div id="route-result"></div>
 </main>
 {% endblock %}

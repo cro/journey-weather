@@ -13,6 +13,7 @@ class RouteMap extends HTMLElement {
   #map;
   #group;
   #pieces = [];
+  #ro;
 
   connectedCallback() {
     this.#map = L.map(this);
@@ -21,10 +22,14 @@ class RouteMap extends HTMLElement {
       maxZoom: 19,
     }).addTo(this.#map);
     this.#group = L.layerGroup().addTo(this.#map);
+    // the element may be display:none until the first plan; keep Leaflet sized right
+    this.#ro = new ResizeObserver(() => this.#map?.invalidateSize());
+    this.#ro.observe(this);
     this.#render();
   }
 
   disconnectedCallback() {
+    this.#ro?.disconnect();
     this.#map?.remove();
     this.#map = undefined;
   }

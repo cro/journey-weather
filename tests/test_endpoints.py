@@ -135,12 +135,16 @@ def test_result_streams_result_then_label_patches(client, monkeypatch):
     evs = events_of(
         client.get("/frag/result" + ds({}), headers=DS_HEADER).text
     )
-    assert [e["type"] for e in evs] == ["datastar-patch-elements"] * 3
+    assert [e["type"] for e in evs] == [
+        "datastar-patch-elements", "datastar-patch-signals",
+        "datastar-patch-elements", "datastar-patch-elements",
+    ]
     assert evs[0]["elements"].strip() == '<div id="form-errors"></div>'
-    assert 'id="route-result"' in evs[1]["elements"]
-    assert "near 1.00, 2.00" in evs[1]["elements"]  # fallback labels first (§4.8)
-    assert 'id="label-1"' in evs[1]["elements"]
-    assert evs[2]["elements"] == '<span id="label-1">Ash Fork</span>'
+    assert json.loads(evs[1]["signals"]) == {"routeJson": '{"pieces":[],"stops":[]}'}  # persistent map (§5)
+    assert 'id="route-result"' in evs[2]["elements"]
+    assert "near 1.00, 2.00" in evs[2]["elements"]  # fallback labels first (§4.8)
+    assert "route-map" not in evs[2]["elements"]  # map lives outside the morph region
+    assert evs[3]["elements"] == '<span id="label-1">Ash Fork</span>'
 
 
 def test_result_escapes_label_html(client, monkeypatch):
@@ -160,5 +164,6 @@ def test_result_escapes_label_html(client, monkeypatch):
 def test_index_page_has_form_containers(client):
     body = client.get("/").text
     for needle in ('id="stops"', 'id="form-errors"', 'id="route-result"',
+                   '<route-map id="trip-map"', 'data-attr:data-route="$routeJson"',
                    'data-bind="trip.s0.name"', 'data-bind="interval"', "data-indicator:planning"):
         assert needle in body

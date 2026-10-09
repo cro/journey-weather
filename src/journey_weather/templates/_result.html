@@ -20,9 +20,6 @@
     <span class="legend-note">Temperatures °F; “wind/gust” mph; static speeds, no traffic.</span>
   </div>
 
-  <route-map data-route="{{ result.map_json }}" data-attr:selected="$selected"
-             data-on:row-select="$selected = evt.detail.row" style="height:420px"></route-map>
-
   <table class="itinerary">
     <thead>
       <tr><th>#</th><th>Place</th><th>Local time</th><th></th><th>°F</th><th>in/h (%)</th><th>mph/gust</th><th>Flags</th></tr>
