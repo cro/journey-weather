@@ -1,6 +1,90 @@
-main {
-  max-width: 60rem;
+:root {
+  --clear: #2e7d32;
+  --warning: #f9a825;
+  --severe: #c62828;
+  --nodata: #9e9e9e;
+}
+
+main.page {
+  max-width: 72rem;
   margin: 0 auto;
   padding: 1.5rem;
   font-family: var(--wa-font-family-body, sans-serif);
 }
+
+.sub { color: var(--wa-color-text-quiet, #555); }
+
+#stops .stop-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 0.5rem;
+}
+.stop-row wa-input { flex: 1 1 auto; }
+
+.controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin: 0.5rem 0 1rem;
+}
+
+.chip {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: #fff;
+  margin-right: 0.4rem;
+}
+.chip-clear { background: var(--clear); }
+.chip-warning { background: var(--warning); }
+.chip-severe { background: var(--severe); }
+.chip-nodata { background: var(--nodata); }
+.legend { margin: 0.75rem 0; }
+.legend-note { display: block; font-size: 0.8rem; color: #555; margin-top: 0.3rem; }
+
+route-map { display: block; border-radius: 8px; overflow: hidden; margin: 0.5rem 0; }
+.leaflet-tooltip { font-weight: 700; background: transparent; border: none; box-shadow: none; color: #fff; }
+
+table.itinerary {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.75rem;
+}
+table.itinerary th, table.itinerary td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid #ddd;
+  text-align: left;
+  vertical-align: top;
+}
+table.itinerary tr[data-on\\:click] { cursor: pointer; }
+tr.level-warning { background: color-mix(in srgb, var(--warning) 14%, white); }
+tr.level-severe { background: color-mix(in srgb, var(--severe) 14%, white); }
+tr.level-nodata { color: var(--nodata); }
+tr.selected td { outline: 2px solid var(--wa-color-brand, #0071ec); outline-offset: -2px; }
+td.badges wa-badge { margin-right: 0.25rem; }
+.leave { font-size: 0.8rem; color: #555; }
+
+.status-strip {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  font-size: 0.85rem;
+  margin: 0.5rem 0;
+}
+
+.detail {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  margin: 0.75rem 0;
+  background: #fafafa;
+}
+.detail table.hours { border-collapse: collapse; }
+.detail table.hours th, .detail table.hours td {
+  border: 1px solid #e3e3e3;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.85rem;
+}
+.errlist { margin: 0; padding-left: 1.2rem; }

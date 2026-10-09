@@ -4,6 +4,20 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from . import config
+# WMO weather_code → vendored lucide icon (PLAN.md §5 table).
+WMO_ICON: dict[int, str] = {
+    0: "sun", 1: "cloud-sun", 2: "cloud-sun", 3: "cloud",
+    45: "cloud-fog", 48: "cloud-fog",
+    51: "cloud-drizzle", 53: "cloud-drizzle", 55: "cloud-drizzle",
+    56: "cloud-drizzle", 57: "cloud-drizzle",
+    61: "cloud-rain", 63: "cloud-rain", 65: "cloud-rain",
+    66: "cloud-rain", 67: "cloud-rain",
+    80: "cloud-rain", 81: "cloud-rain", 82: "cloud-rain",
+    71: "cloud-snow", 73: "cloud-snow", 75: "cloud-snow",
+    77: "cloud-snow", 85: "cloud-snow", 86: "cloud-snow",
+    95: "cloud-lightning", 96: "cloud-lightning", 99: "cloud-lightning",
+}
+
 
 LEVELS = ("clear", "warning", "severe")
 
@@ -15,6 +29,11 @@ class Trigger:
     hour: int  # epoch seconds of the offending hour
     value: float | None  # representative metric for the detail sentence
 
+
+
+def hour_level(h: Mapping) -> str | None:
+    """Max level across rules for a single hour dict (detail-panel rows)."""
+    return _max_level([fn(h) for fn in _RULES.values()])
 
 def _max_level(levels: Sequence[str | None]) -> str:
     best = 0

@@ -251,7 +251,7 @@ Badges use `wind` (wind rule) and `eye-off` (visibility).
 
 ## 6. Milestones
 
-1. **Scaffold**
+1. **Scaffold** — DONE 2026-10-09 (`2d4f785`; zero 404s, styled `wa-button` verified)
    - `uv init --package journey-weather`, deps from §2, `app.py` serving `index.html`, static mount, `GET /healthz` → `{"ok": true}`.
    - `scripts/vendor.sh` builds `static/vendor/`:
      - `npm pack @awesome.me/webawesome@3.14.0` → extract `package/dist-cdn/*` into `vendor/webawesome/`;
@@ -259,13 +259,13 @@ Badges use `wind` (wind rule) and `eye-off` (visibility).
      - `npm pack lucide-static@1.53.0` → the 10 icons from §2 into `vendor/icons/`;
      - curl the Datastar bundle into `vendor/datastar/datastar.js`.
    - *Verify:* the page loads with zero 404s in the server log; a `<wa-button>` renders styled.
-2. **Cache + clients**: `cache.py`, `geocode.py`, `routing.py`, `labels.py`.
+2. **Cache + clients** — DONE 2026-10-09 (`20b3f1c`; fixture tests + live smoke legs 6.05/4.23/2.58/2.13 h)
    - *Verify:* pytest with recorded fixtures (geocoding the 5 example cities; the 5-stop OSRM response); a live smoke script prints the resolved stops and leg durations 6.06 / 4.24 / 2.59 / 2.15 h.
-3. **Schedule + sampling** (pure).
+3. **Schedule + sampling** (pure) — DONE 2026-10-09 (`6acca66`; incl. Kanab→Flagstaff 11:13 MST case)
    - *Verify:* pytest — leg split offsets (6620 = 4266 + 2353 + 1 case); arrival monotonicity; leave-before-arrival error; waypoint count per interval; the Kanab (America/Denver) → Flagstaff (America/Phoenix) local-clock case from §7.
-4. **Weather + severity + units**.
+4. **Weather + severity + units** — DONE 2026-10-09 (`71af41f`; 20-row live §7 itinerary smoke)
    - *Verify:* pytest — each rule in isolation at warning/severe boundaries; null-input skip; window indexing; horizon pre-check; unit conversions. A live smoke script prints the §7 itinerary table.
-5. **Endpoints**: `/frag/stop-row`, `/frag/result` (signals via `read_signals`, SSE via `datastar_response` + `SSE.patch_elements`; confirm the `selector`/`mode` keyword spelling against the installed `datastar_py` source), label streaming.
+5. **Endpoints** — DONE 2026-10-09 (`selector=`/`mode=` confirmed in installed source; curl -N shows `#route-result` then 15 `#label-*` patch events)
    - *Verify:* `curl -N 'http://127.0.0.1:8000/frag/result?datastar=<urlencoded signals JSON>'` shows a `datastar-patch-elements` event for `#route-result`, then `#label-*` events.
 6. **UI**: templates, `route-map.js`, CSS.
    - *Verify:* scripted browser session on the real page: enter the §7 trip, click Plan, see the spinner, then the map with colored pieces and 5 markers; clicking a row highlights the piece and shows the detail; screenshots for the idle, loading, result, validation-error, and horizon-error states.

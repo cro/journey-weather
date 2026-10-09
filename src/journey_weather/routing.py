@@ -47,14 +47,18 @@ def _coords_param(points: list[tuple[float, float]]) -> str:
     return ";".join(f"{lon},{lat}" for lat, lon in points)
 
 
-async def _request(cache: Cache, points: list[tuple[float, float]]) -> dict:
+async def _request(
+    cache: Cache, points: list[tuple[float, float]],
+    *, hits: list | None = None, refresh: bool = False,
+) -> dict:
     url = str(
         OSRM_BASE.copy_with(
             path=f"{OSRM_BASE.path}/{_coords_param(points)}",
             params=OSRM_PARAMS,
         )
     )
-    hit = await cache.cached_get(url, config.TTL_ROUTE, service="OSRM")
+    hit = await cache.cached_get(url, config.TTL_ROUTE, service="OSRM",
+                                 refresh=refresh, hits=hits)
     return json.loads(hit.body)
 
 
@@ -82,24 +86,30 @@ def _split_legs(route: dict) -> list[Leg]:
     return legs
 
 
-async def route_trip(cache: Cache, points: list[tuple[float, float]]) -> list[Leg]:
+async def route_trip(
+    cache: Cache, points: list[tuple[float, float]],
+    *, hits: list | None = None, refresh: bool = False,
+) -> list[Leg]:
     """Route all stops in order (≥2 points). Raises NoRoute(pair) with the
     failing consecutive pair identified via pairwise probes (PLAN.md §4.3)."""
-    data = await _request(cache, points)
+    data = await _request(cache, points, hits=hits, refresh=refresh)
     code = data.get("code")
     if code != "Ok":
         if code == "NoRoute":
-            pair = await find_failing_pair(cache, points)
+            pair = await find_failing_pair(cache, points, hits=hits, refresh=refresh)
             raise NoRoute(pair)
         raise UpstreamError("OSRM", f"code={code!r}")
     return _split_legs(data["routes"][0])
 
 
-async def find_failing_pair(cache: Cache, points: list[tuple[float, float]]) -> int | None:
+async def find_failing_pair(
+    cache: Cache, points: list[tuple[float, float]],
+    *, hits: list | None = None, refresh: bool = False,
+) -> int | None:
     """Index i of the first consecutive pair points[i]->points[i+1] that cannot
     be routed; None if every pair routes (transient bulk failure)."""
     for i in range(len(points) - 1):
-        data = await _request(cache, [points[i], points[i + 1]])
+        data = await _request(cache, [points[i], points[i + 1]], hits=hits, refresh=refresh)
         if data.get("code") != "Ok":
             return i
     return None

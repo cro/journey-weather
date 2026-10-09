@@ -1,8 +1,25 @@
 {% extends "base.html" %}
 {% block body %}
-<main data-signals='{}'>
+<main class="page" data-signals='{"trip":{"s0":{"name":"","leave":""},"s1":{"name":"","leave":""}},"interval":60,"selected":-1,"planning":false}'>
   <h1>Journey Weather</h1>
-  <p>Forecast along your route, at every stop and waypoint in between.</p>
-  <wa-button variant="brand" size="large">Plan a trip</wa-button>
+  <p class="sub">Forecast along your route, at every stop and waypoint in between.</p>
+
+  <div id="stops">
+    {% for i in range(2) %}{% include "_stop_row.html" %}{% endfor %}
+  </div>
+  <div class="controls">
+    <wa-button id="add-stop" size="small" data-on:click="@get('/frag/stop-row')">Add stop</wa-button>
+    <wa-select data-bind:interval label="Waypoint every">
+      <option value="30">30 min</option>
+      <option value="60">60 min</option>
+      <option value="90">90 min</option>
+      <option value="120">120 min</option>
+    </wa-select>
+    <wa-button variant="brand" data-on:click="@get('/frag/result')" data-indicator:planning>Plan</wa-button>
+    <wa-spinner data-show="$planning"></wa-spinner>
+  </div>
+
+  <div id="form-errors"></div>
+  <div id="route-result"></div>
 </main>
 {% endblock %}

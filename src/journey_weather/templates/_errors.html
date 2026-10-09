@@ -1,0 +1,10 @@
+<div id="form-errors">
+  <wa-callout variant="danger" label="Can’t plan this trip">
+    <ul class="errlist">
+      {% for m in messages %}<li>{{ m }}</li>{% endfor %}
+    </ul>
+    {% if retry %}
+    <wa-button slot="actions" data-on:click="@get('/frag/result')">Retry</wa-button>
+    {% endif %}
+  </wa-callout>
+</div>

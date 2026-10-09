@@ -67,16 +67,24 @@ def parse_override(raw: str) -> Stop | None:
     return Stop(display=name.strip(), lat=lat, lon=lon, tz="", raw=raw)
 
 
-async def lookup_tz(cache: Cache, lat: float, lon: float) -> str:
+async def lookup_tz(
+    cache: Cache, lat: float, lon: float, *, hits: list | None = None, refresh: bool = False
+) -> str:
     """IANA zone for override coords via a 1-day forecast (PLAN.md §4.2 step 5)."""
     url = TZ_URL.format(lat=f"{lat:.6f}", lon=f"{lon:.6f}")
-    hit = await cache.cached_get(url, config.TTL_GEOCODE, service="Open-Meteo")
+    hit = await cache.cached_get(
+        url, config.TTL_GEOCODE, service="Open-Meteo", refresh=refresh, hits=hits
+    )
     return json.loads(hit.body)["timezone"]
 
 
-async def _results(cache: Cache, name: str, count: int) -> list[dict]:
+async def _results(
+    cache: Cache, name: str, count: int, *, hits: list | None = None, refresh: bool = False
+) -> list[dict]:
     url = str(GEOCODE_BASE.copy_with(params={"name": name, "count": count}))
-    hit = await cache.cached_get(url, config.TTL_GEOCODE, service="Geocoding")
+    hit = await cache.cached_get(
+        url, config.TTL_GEOCODE, service="Geocoding", refresh=refresh, hits=hits
+    )
     return json.loads(hit.body).get("results") or []
 
 
@@ -92,21 +100,23 @@ def _to_stop(raw: str, r: dict) -> Stop:
     )
 
 
-async def resolve_stop(cache: Cache, raw: str) -> Stop:
+async def resolve_stop(
+    cache: Cache, raw: str, *, hits: list | None = None, refresh: bool = False
+) -> Stop:
     """Resolve one stop row (PLAN.md §4.2). Callers run these via asyncio.gather."""
     override = parse_override(raw)
     if override is not None:
-        override.tz = await lookup_tz(cache, override.lat, override.lon)
+        override.tz = await lookup_tz(cache, override.lat, override.lon, hits=hits, refresh=refresh)
         return override
 
     query = raw.strip()
-    results = await _results(cache, query, count=5)
+    results = await _results(cache, query, count=5, hits=hits, refresh=refresh)
     if not results and ", " in query:
-        # Step 2: split at the last ", " into city, suffix; retry by city.
+        # Step 2: split at the last ", ", into city, suffix; retry by city.
         city, suffix = query.rsplit(", ", 1)
         suffix = suffix.strip().upper()
         want_admin = US_STATES.get(suffix)
-        for r in await _results(cache, city, count=10):
+        for r in await _results(cache, city, count=10, hits=hits, refresh=refresh):
             if (want_admin and r.get("admin1") == want_admin) or (
                 (r.get("country_code") or "").upper() == suffix
             ):

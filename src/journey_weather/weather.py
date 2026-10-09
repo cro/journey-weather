@@ -77,6 +77,8 @@ async def fetch_all(
     *,
     chunk_size: int = 10,
     chunk_pause_s: float = 0.5,
+    hits: list | None = None,
+    refresh: bool = False,
 ) -> list[Location | None]:
     """Weather for every row coordinate. None marks `nodata` rows.
 
@@ -85,7 +87,8 @@ async def fetch_all(
     Retryable failure with nothing cached raises UpstreamError."""
     try:
         hit = await cache.cached_get(
-            build_url(points), config.TTL_FORECAST, service="Open-Meteo"
+            build_url(points), config.TTL_FORECAST, service="Open-Meteo",
+            refresh=refresh, hits=hits,
         )
     except UpstreamError as exc:
         retryable = exc.detail.startswith("HTTP 429") or exc.detail.startswith("HTTP 5")
@@ -98,7 +101,8 @@ async def fetch_all(
             chunk = points[i : i + chunk_size]
             try:
                 hit = await cache.cached_get(
-                    build_url(chunk), config.TTL_FORECAST, service="Open-Meteo"
+                    build_url(chunk), config.TTL_FORECAST, service="Open-Meteo",
+                    refresh=refresh, hits=hits,
                 )
             except UpstreamError:
                 out.extend([None] * len(chunk))

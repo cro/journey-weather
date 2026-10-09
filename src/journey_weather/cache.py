@@ -89,15 +89,24 @@ class Cache:
         service: str,
         refresh: bool = False,
         headers: dict[str, str] | None = None,
+        hits: list[CacheHit] | None = None,
     ) -> CacheHit:
+        """`hits`, when given, receives every CacheHit this call returns so the
+        pipeline can report the oldest cache age among responses used (§5)."""
         key = cache_key(url)
         row = await self._row(key)
         now = int(time.time())
+
+        def _ret(hit: CacheHit) -> CacheHit:
+            if hits is not None:
+                hits.append(hit)
+            return hit
+
         if row is not None and not refresh:
             body, fetched_at, _stored_ttl = row
             age = now - fetched_at
             if age < ttl:
-                return CacheHit(bytes(body), age, False)
+                return _ret(CacheHit(bytes(body), age, False))
 
         failure: str | None = None
         for attempt in range(config.RETRY_MAX + 1):
@@ -126,9 +135,9 @@ class Cache:
                 (key, resp.content, now, ttl),
             )
             await self._db.commit()
-            return CacheHit(resp.content, 0, False)
+            return _ret(CacheHit(resp.content, 0, False))
 
         if row is not None:  # serve stale (PLAN.md §3)
             body, fetched_at, _stored_ttl = row
-            return CacheHit(bytes(body), now - fetched_at, True)
+            return _ret(CacheHit(bytes(body), now - fetched_at, True))
         raise UpstreamError(service, failure or "request failed")
