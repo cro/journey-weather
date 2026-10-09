@@ -4,7 +4,7 @@ Road-trip weather planner. Design & rationale live in **[PLAN.md](PLAN.md)** —
 
 ## Where it stands (2026-10-09)
 
-**All 7 milestones complete and verified.** Latest fix `d69f7b9` (Trap 4; 111 tests pass, `uv run pytest -q`, ~1 s; live browser re-verified: Plan → edit Leave-at → Plan updates table/map). Dev server runs as the `journey-dev` service on `0.0.0.0:8000` (LAN-reachable; `curl localhost:8000/healthz` → `{"ok":true}`). Live browser E2E done end-to-end: idle, loading, result + map, row selection, validation error, horizon error, and repeat-planning.
+**All 7 milestones complete and verified.** Latest change: the Trap 1 boot assertion — `base.html` now *proves* Webawesome registration before loading Datastar (`await import`), closing the last follow-up item; 112 tests pass (`uv run pytest -q`, ~1 s). Earlier fixes `d69f7b9` (Trap 4) re-verified in the same live browser run: Plan → edit Leave-at → Plan updates table/map. Dev server runs as the `journey-dev` service on `0.0.0.0:8000` (LAN-reachable; `curl localhost:8000/healthz` → `{"ok":true}`). Live browser E2E done end-to-end: idle, loading, result + map, row selection, validation error, horizon error, repeat-planning.
 
 | Milestone | Commit | What |
 |---|---|---|
@@ -23,7 +23,7 @@ Road-trip weather planner. Design & rationale live in **[PLAN.md](PLAN.md)** —
 These were found **in a live browser**, not from docs — the plan's "verified facts" (§2) were correct but incomplete. All are documented in PLAN.md §5/§8; they are the most likely things a maintainer will trip on.
 
 **1. Webawesome must register before Datastar (commit `e11ab5d`).**
-`data-bind` reads/writes the element's `value` property. Webawesome's `webawesome.loader.js` defines custom elements *after* Datastar has processed the DOM, so on an undefined `wa-input` the binding connects to nothing — typed text never reaches the signals, form appears to work but sends blanks. `webawesome.js` does NOT help (it only re-exports the loader). Fix in force: `base.html` has an inline module script importing the 8 used components directly (`components/<name>/<name>.js`) **before** the `datastar.js` module. SSE-patched rows are fine (they arrive post-upgrade).
+`data-bind` reads/writes the element's `value` property. Webawesome's `webawesome.loader.js` defines custom elements *after* Datastar has processed the DOM, so on an undefined `wa-input` the binding connects to nothing — typed text never reaches the signals, form appears to work but sends blanks. `webawesome.js` does NOT help (it only re-exports the loader). Fix in force: `base.html` has an inline module script importing the 8 used components directly (`components/<name>/<name>.js`), asserting `customElements.get()` for each, and only then booting Datastar via `await import` — there is no static `datastar.js` tag, so the ordering is a hard barrier now: a broken guard throws loudly at boot instead of binding to nothing (pinned by `test_datastar_loads_only_behind_the_registration_guard`). SSE-patched rows are fine (they arrive post-upgrade).
 
 **2. Use the value form of `data-bind`, never the colon shorthand (commit `e11ab5d`).**
 `data-bind:trip.s0.name` (dotted path via colon modifier) silently fails to write back on web components. `data-bind="trip.s0.name"` works. PLAN.md §2 was corrected to reflect this.
@@ -67,11 +67,11 @@ data/journey.db  (gitignored, created at startup; 30 d geocode / 7 d OSRM / 3 h 
 - Run: `uv run uvicorn journey_weather.app:app --reload --host 0.0.0.0 --port 8000`
 - Refresh vendored assets (rare; they are committed): `uv run scripts/vendor.sh`
 - Live smoke (hits real upstreams, uses `data/journey.db`): `uv run scripts/smoke_milestone2.py` / `smoke_milestone4.py`
-- Tests: `uv run pytest -q` → 110. `tests/conftest.py` has `mock_client(routes)` + the `cache`/`no_sleep` fixtures; pure modules are unit-tested, I/O tested against recorded fixtures + synthetic fault handlers.
+- Tests: `uv run pytest -q` → 112. `tests/conftest.py` has `mock_client(routes)` + the `cache`/`no_sleep` fixtures; pure modules are unit-tested, I/O tested against recorded fixtures + synthetic fault handlers.
 
 ## Test map (where the trap regressions live)
 
-- `test_endpoints.py` — SSE frame order `form-errors → patch_signals(_routeJson) → #route-result → labels`; asserts `route-map` is **absent** from the fragment and **present** in `/`; `datastar_py` `selector=`/`mode=` framing; Trap 4 pin: every patch-signals key is `_`-prefixed.
+- `test_endpoints.py` — SSE frame order `form-errors → patch_signals(_routeJson) → #route-result → labels`; asserts `route-map` is **absent** from the fragment and **present** in `/`; `datastar_py` `selector=`/`mode=` framing; Trap 4 pin: every patch-signals key is `_`-prefixed; Trap 1 pin: Datastar boots only behind the registration guard, and every `<wa-*>` tag in the templates is in the guarded set.
 - `test_faults.py` — 503/429/timeout per upstream, chunk-of-10 weather fallback → `None`/`level-nodata`, stale serving, Refresh/stale-badge render.
 - `test_sampling.py` / `test_schedule.py` — the §4.5 math + Kanab→Flagstaff tz case + `6620` split.
 - `test_weather.py` / `test_severity.py` / `test_units.py` — boundaries, null-skip, window indexing, horizon, imperial conversions.
@@ -83,7 +83,6 @@ No accounts, no saved/shared routes, no live traffic, no stop reordering/removal
 ## Unfinished / follow-up candidates
 
 - Nothing blocking. If the Webawesome autoloader assumption is ever revisited, Trap 1 is the constraint.
-- Consider a client-side assertion that `customElements.get('wa-input')` is truthy before Datastar boots, to fail loudly if the eager-import ordering in `base.html` is ever broken.
 
 ## Session log — 2026-10-09 (second Plan click silently did nothing)
 
@@ -95,3 +94,10 @@ Reported: after a successful Plan, editing stop 1's Leave-at and clicking Plan a
 - Verified end-to-end in a live browser: typed trip → Plan (200, 304-char URL) → edited Leave-at 07:00→09:00 → Plan again (200, 304-char URL): itinerary updated (row 0 = 09:00, Kanab arrival 15:03), Leaflet map still alive (7 panes, `data-route` = the new 93 KB geometry), `#form-errors` empty; screenshot captured.
 - Docs (`d69f7b9` + `67ae812` + this): PLAN.md §2 now records the bundle default `filterSignals {include: /.*/, exclude: /(^|\.)_/}`; §4.1 initial signals and §5 map refs updated; new §8 watch-out. STATUS.md gained Trap 4 ("four integration traps"), Trap 3 and the test map renamed accordingly, milestone table gained the re-Plan row.
 - Environment: `journey-dev` was found down; restarted with the absolute uv path (PATH quirk, "Also non-obvious") — running on `0.0.0.0:8000` with the fix. Browser tabs from this investigation were closed; no scratch files to clean up.
+
+## Session log — 2026-10-09 (Trap 1 boot assertion — final follow-up closed)
+
+- `base.html`: the 8 eager Webawesome imports now **assert** `customElements.get(name)` for every component and boot Datastar via `await import` only after the check passes; the static `<script src=…/datastar.js>` tag was removed. The ordering that was convention is now mechanism: a future breakage is an uncaught `Error` at boot, not silent blank bindings.
+- New pin `test_datastar_loads_only_behind_the_registration_guard` (111 → 112): no datastar script tag in `<head>`; exactly one inline module script; import set == guarded set; throw-before-`await import`; every `<wa-*>` tag across the templates ⊆ guarded set.
+- Live browser re-verified (fresh tab on `journey-dev`): all 8 `wa-*` registered, `datastar.js` fetched exactly once, zero console errors, zero 4xx/5xx. Typed Layton→Kanab + Leave-at `2026-10-10T09:00` → Plan: signals echoed with typed values (Trap 1/2 binding proven over the wire), 20-row table (256 cells), 93 KB `_routeJson` into the persistent map, Leaflet panes + tiles alive, 304-char request URL (Trap 4 intact); re-Plan again clean. Screenshot reviewed.
+- Negative path (guard missing → throw → Datastar never loads) is guaranteed by module semantics (top-level throw aborts before the dynamic import) and pinned statically; could not exercise it live because the harness's `tab.route` respond-override silently no-ops (reported upstream).

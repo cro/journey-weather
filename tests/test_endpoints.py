@@ -1,6 +1,8 @@
 """Endpoint tests (PLAN.md §6.5): SSE framing for stop-row and result fragments."""
 
 import json
+import re
+from pathlib import Path
 from urllib.parse import quote
 
 import pytest
@@ -189,3 +191,29 @@ def test_index_page_has_form_containers(client):
                    '<route-map id="trip-map"', 'data-attr:data-route="$_routeJson"',
                    'data-bind="trip.s0.name"', 'data-bind="interval"', "data-indicator:planning"):
         assert needle in body
+
+
+def test_datastar_loads_only_behind_the_registration_guard(client):
+    """Trap 1 regression: a binding on an unregistered wa-* element silently
+    connects to nothing (blank form fields, no error). base.html must assert
+    every imported component actually registered and boot Datastar via
+    `await import` only after that check — no standalone datastar script tag
+    may exist that could bypass the guard."""
+    head = client.get("/").text.split("</head>")[0]
+    assert re.search(r'<script[^>]*src="[^"]*datastar', head) is None
+    guards = re.findall(r'<script type="module">(.*?)</script>', head, re.S)
+    assert len(guards) == 1
+    guard = guards[0]
+    imported = set(re.findall(r"vendor/webawesome/components/([a-z-]+)/", guard))
+    required = set(re.findall(r"'wa-([a-z-]+)'", guard))
+    assert imported == required
+    assert guard.index("if (missing.length) throw") < guard.index(
+        "await import('/static/vendor/datastar/datastar.js')"
+    )
+    # Every wa-* tag any template can render must be in the guarded set, or
+    # its data-bind would connect to an undefined custom element.
+    tpl_dir = Path(app_module.__file__).parent / "templates"
+    used = set()
+    for f in tpl_dir.glob("*.html"):
+        used.update(re.findall(r"<wa-([a-z-]+)[\s>]", f.read_text()))
+    assert used <= required, f"unguarded wa tags in templates: {sorted(used - required)}"

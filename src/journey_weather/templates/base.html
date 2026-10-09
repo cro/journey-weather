@@ -9,6 +9,12 @@
 <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="/static/app.css">
 <script type="module">
+// Trap 1: Webawesome must register before Datastar processes the DOM —
+// `data-bind` reads/writes the element's `value` property, so a binding on an
+// undefined custom element silently connects to nothing. Import the components
+// eagerly, assert every one actually registered, and load Datastar only after
+// the assertion passes (dynamic import). If the eager-import ordering is ever
+// broken again this fails loudly here instead of as blank form fields.
 import '/static/vendor/webawesome/components/button/button.js';
 import '/static/vendor/webawesome/components/input/input.js';
 import '/static/vendor/webawesome/components/select/select.js';
@@ -17,8 +23,11 @@ import '/static/vendor/webawesome/components/badge/badge.js';
 import '/static/vendor/webawesome/components/callout/callout.js';
 import '/static/vendor/webawesome/components/icon/icon.js';
 import '/static/vendor/webawesome/components/tooltip/tooltip.js';
+const required = ['wa-button', 'wa-input', 'wa-select', 'wa-spinner', 'wa-badge', 'wa-callout', 'wa-icon', 'wa-tooltip'];
+const missing = required.filter((name) => customElements.get(name) === undefined);
+if (missing.length) throw new Error(`webawesome components not registered before Datastar (Trap 1): ${missing.join(', ')}`);
+await import('/static/vendor/datastar/datastar.js');
 </script>
-<script type="module" src="/static/vendor/datastar/datastar.js"></script>
 <script src="/static/vendor/leaflet/leaflet.js"></script>
 <script type="module" src="/static/route-map.js"></script>
 </head>
