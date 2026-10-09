@@ -251,7 +251,7 @@ Badges use `wind` (wind rule) and `eye-off` (visibility).
 
 ## 6. Milestones
 
-1. **Scaffold**
+1. **Scaffold** — DONE 2026-10-09 (verified: zero 404s, styled `wa-button`, committed `2d4f785`)
    - `uv init --package journey-weather`, deps from §2, `app.py` serving `index.html`, static mount, `GET /healthz` → `{"ok": true}`.
    - `scripts/vendor.sh` builds `static/vendor/`:
      - `npm pack @awesome.me/webawesome@3.14.0` → extract `package/dist-cdn/*` into `vendor/webawesome/`;
@@ -259,7 +259,7 @@ Badges use `wind` (wind rule) and `eye-off` (visibility).
      - `npm pack lucide-static@1.53.0` → the 10 icons from §2 into `vendor/icons/`;
      - curl the Datastar bundle into `vendor/datastar/datastar.js`.
    - *Verify:* the page loads with zero 404s in the server log; a `<wa-button>` renders styled.
-2. **Cache + clients**: `cache.py`, `geocode.py`, `routing.py`, `labels.py`.
+2. **Cache + clients** — DONE 2026-10-09: `cache.py`, `geocode.py`, `routing.py`, `labels.py` (live smoke legs 6.05/4.23/2.58/2.13 h — OSRM data drift ≤0.02 h vs probe)
    - *Verify:* pytest with recorded fixtures (geocoding the 5 example cities; the 5-stop OSRM response); a live smoke script prints the resolved stops and leg durations 6.06 / 4.24 / 2.59 / 2.15 h.
 3. **Schedule + sampling** (pure).
    - *Verify:* pytest — leg split offsets (6620 = 4266 + 2353 + 1 case); arrival monotonicity; leave-before-arrival error; waypoint count per interval; the Kanab (America/Denver) → Flagstaff (America/Phoenix) local-clock case from §7.
