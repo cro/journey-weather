@@ -48,7 +48,7 @@ Browser (Jinja HTML + Webawesome + Datastar + <route-map>)
    │  GET /frag/stop-row    SSE: append one stop row to #stops (reads signals for next index)
    │  GET /frag/result      SSE: validate → patch #form-errors or #route-result, then stream label patches
    ▼
-pipeline.plan_trip(trip) — all async, one shared httpx.AsyncClient (timeout 15 s)
+pipeline.plan_trip(signals) — all async, one shared httpx.AsyncClient (timeout 15 s)
    parse_stops → geocode (asyncio.gather) → route (1 OSRM call) → schedule (per-leg departures)
    → sample waypoints → weather (1 bulk call) → severity → render
    → labels (Nominatim, serialized, streamed as follow-up patches)
@@ -251,7 +251,7 @@ Badges use `wind` (wind rule) and `eye-off` (visibility).
 
 ## 6. Milestones
 
-1. **Scaffold** — DONE 2026-10-09 (verified: zero 404s, styled `wa-button`, committed `2d4f785`)
+1. **Scaffold**
    - `uv init --package journey-weather`, deps from §2, `app.py` serving `index.html`, static mount, `GET /healthz` → `{"ok": true}`.
    - `scripts/vendor.sh` builds `static/vendor/`:
      - `npm pack @awesome.me/webawesome@3.14.0` → extract `package/dist-cdn/*` into `vendor/webawesome/`;
@@ -259,11 +259,11 @@ Badges use `wind` (wind rule) and `eye-off` (visibility).
      - `npm pack lucide-static@1.53.0` → the 10 icons from §2 into `vendor/icons/`;
      - curl the Datastar bundle into `vendor/datastar/datastar.js`.
    - *Verify:* the page loads with zero 404s in the server log; a `<wa-button>` renders styled.
-2. **Cache + clients** — DONE 2026-10-09: `cache.py`, `geocode.py`, `routing.py`, `labels.py` (live smoke legs 6.05/4.23/2.58/2.13 h — OSRM data drift ≤0.02 h vs probe)
+2. **Cache + clients**: `cache.py`, `geocode.py`, `routing.py`, `labels.py`.
    - *Verify:* pytest with recorded fixtures (geocoding the 5 example cities; the 5-stop OSRM response); a live smoke script prints the resolved stops and leg durations 6.06 / 4.24 / 2.59 / 2.15 h.
-3. **Schedule + sampling** (pure) — DONE 2026-10-09: `schedule.py`, `sampling.py`; split/monotonicity/error/count/tz tests all green (37 suite)
+3. **Schedule + sampling** (pure).
    - *Verify:* pytest — leg split offsets (6620 = 4266 + 2353 + 1 case); arrival monotonicity; leave-before-arrival error; waypoint count per interval; the Kanab (America/Denver) → Flagstaff (America/Phoenix) local-clock case from §7.
-4. **Weather + severity + units** — DONE 2026-10-09: `weather.py`, `severity.py`, `units.py`; 58 M4 tests (95 total); live smoke prints 20-row §7 itinerary, Kanab→Flagstaff 11:13 MST ✓
+4. **Weather + severity + units**.
    - *Verify:* pytest — each rule in isolation at warning/severe boundaries; null-input skip; window indexing; horizon pre-check; unit conversions. A live smoke script prints the §7 itinerary table.
 5. **Endpoints**: `/frag/stop-row`, `/frag/result` (signals via `read_signals`, SSE via `datastar_response` + `SSE.patch_elements`; confirm the `selector`/`mode` keyword spelling against the installed `datastar_py` source), label streaming.
    - *Verify:* `curl -N 'http://127.0.0.1:8000/frag/result?datastar=<urlencoded signals JSON>'` shows a `datastar-patch-elements` event for `#route-result`, then `#label-*` events.
