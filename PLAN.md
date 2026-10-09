@@ -263,7 +263,7 @@ Badges use `wind` (wind rule) and `eye-off` (visibility).
    - *Verify:* pytest with recorded fixtures (geocoding the 5 example cities; the 5-stop OSRM response); a live smoke script prints the resolved stops and leg durations 6.06 / 4.24 / 2.59 / 2.15 h.
 3. **Schedule + sampling** (pure) — DONE 2026-10-09: `schedule.py`, `sampling.py`; split/monotonicity/error/count/tz tests all green (37 suite)
    - *Verify:* pytest — leg split offsets (6620 = 4266 + 2353 + 1 case); arrival monotonicity; leave-before-arrival error; waypoint count per interval; the Kanab (America/Denver) → Flagstaff (America/Phoenix) local-clock case from §7.
-4. **Weather + severity + units**.
+4. **Weather + severity + units** — DONE 2026-10-09: `weather.py`, `severity.py`, `units.py`; 58 M4 tests (95 total); live smoke prints 20-row §7 itinerary, Kanab→Flagstaff 11:13 MST ✓
    - *Verify:* pytest — each rule in isolation at warning/severe boundaries; null-input skip; window indexing; horizon pre-check; unit conversions. A live smoke script prints the §7 itinerary table.
 5. **Endpoints**: `/frag/stop-row`, `/frag/result` (signals via `read_signals`, SSE via `datastar_response` + `SSE.patch_elements`; confirm the `selector`/`mode` keyword spelling against the installed `datastar_py` source), label streaming.
    - *Verify:* `curl -N 'http://127.0.0.1:8000/frag/result?datastar=<urlencoded signals JSON>'` shows a `datastar-patch-elements` event for `#route-result`, then `#label-*` events.
