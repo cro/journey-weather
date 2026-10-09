@@ -118,7 +118,7 @@ data/journey.db (gitignored, created on startup)
 2. If there are no results and the name contains `", "`, split at the last `", "` into `city, suffix`. Query `city` with `count=10` and take the first result where `admin1 == US_STATES[suffix.upper()]` (51-entry map: 50 states + DC) or `country_code == suffix.upper()`.
 3. If still nothing → `not found` error.
 4. Stop display = `f"{name}, {admin1}, {country_code}"`; keep `lat`, `lon`, `tz` (IANA).
-5. Override stops: display = given name. Their `tz` comes from `forecast?latitude=…&longitude=…&timezone=auto&count=1` (`timezone` field; cached 30 d).
+5. Override stops: display = given name. Their `tz` comes from `forecast?latitude=…&longitude=…&timezone=auto&forecast_days=1` (`timezone` field; cached 30 d).
 6. All stops are geocoded concurrently with `asyncio.gather`.
 
 ### 4.3 Routing
