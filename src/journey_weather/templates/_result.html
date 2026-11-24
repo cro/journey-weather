@@ -1,9 +1,15 @@
 <div id="route-result" class="result">
-  <div class="status-strip">
-    <span>Generated {{ result.generated_at | utc }}</span>
-    <span>Oldest cached data: {{ result.oldest_age_s | humandur }}</span>
-    {% if result.stale %}<wa-badge variant="warning">stale data</wa-badge>{% endif %}
-    <wa-button size="small" data-on:click="@get('/frag/result?refresh=1')">Refresh</wa-button>
+  <div class="result-toolbar">
+    <div><p class="eyebrow">03 / ITINERARY</p><p class="result-meta">Updated {{ result.generated_at | utc }} · Cache age {{ result.oldest_age_s | humandur }}</p></div>
+    <div class="toolbar-actions">{% if result.stale %}<wa-badge variant="warning">stale data</wa-badge>{% endif %}<wa-button size="small" data-on:click="@get('/frag/result?refresh=1')">Refresh weather</wa-button></div>
+  </div>
+
+  <div class="condition-summary">
+    <div class="summary-stat"><span class="summary-value">{{ result.rows | length }}</span><span class="summary-label">forecast points</span></div>
+    <div class="summary-stat"><span class="summary-value summary-clear">{{ result.legend_counts.clear }}</span><span class="summary-label">clear</span></div>
+    <div class="summary-stat"><span class="summary-value summary-warning">{{ result.legend_counts.warning }}</span><span class="summary-label">watch points</span></div>
+    <div class="summary-stat"><span class="summary-value summary-severe">{{ result.legend_counts.severe }}</span><span class="summary-label">severe</span></div>
+    {% if result.nodata_count %}<div class="summary-stat"><span class="summary-value summary-muted">{{ result.nodata_count }}</span><span class="summary-label">no data</span></div>{% endif %}
   </div>
 
   {% if result.nodata_count %}
@@ -13,38 +19,36 @@
   {% endif %}
 
   <div class="legend">
-    <span class="chip chip-clear">Clear</span>
-    <span class="chip chip-warning">Warning — rain ≥ 0.20 in/h · wind ≥ 29 mph · gust ≥ 39 mph · vis &lt; 1.2 mi · snow/freezing</span>
-    <span class="chip chip-severe">Severe — rain ≥ 0.47 in/h · wind ≥ 39 mph · gust ≥ 48 mph · vis &lt; 0.3 mi · thunder · freezing rain</span>
-    <span class="chip chip-nodata">No data</span>
-    <span class="legend-note">Temperatures °F; “wind/gust” mph; static speeds, no traffic.</span>
+    <span class="legend-item"><i class="legend-dot dot-clear"></i>Clear</span>
+    <span class="legend-item"><i class="legend-dot dot-warning"></i>Watch</span>
+    <span class="legend-item"><i class="legend-dot dot-severe"></i>Severe</span>
+    <span class="legend-item"><i class="legend-dot dot-nodata"></i>No data</span>
+    <span class="legend-note">Rain in/h · wind/gust mph · temperatures °F</span>
   </div>
 
   <table class="itinerary">
     <thead>
-      <tr><th>#</th><th>Place</th><th>Local time</th><th></th><th>°F</th><th>in/h (%)</th><th>mph/gust</th><th>Flags</th></tr>
+      <tr><th>#</th><th>Place</th><th>Local time</th><th>Conditions</th><th>Precipitation</th><th>Wind</th><th>Flags</th></tr>
     </thead>
     <tbody>
       {% for row in result.rows %}
       <tr class="level-{{ row.level }}" data-on:click="$selected = {{ row.n }}"
           data-class:selected="$selected == {{ row.n }}">
-        <td>{{ row.n }}</td>
+        <td class="row-index">{{ "%02d" | format(row.n + 1) }}</td>
         <td>
           {% if row.kind == "stop" %}<strong>{{ row.place }}</strong>
           {% else %}<span id="{{ row.label_id }}">{{ row.place }}</span>{% endif %}
         </td>
-        <td>
-          {{ row.local_time }}
+        <td class="time-cell"><strong>{{ row.local_time }}</strong>
           {% if row.local_leave %}<div class="leave">leave {{ row.local_leave }}</div>{% endif %}
           {% if row.dwell_min %}<div class="leave">{{ row.dwell_min }} min stop</div>{% endif %}
         </td>
-        <td>{% if row.icon %}<wa-icon src="/static/vendor/icons/{{ row.icon }}.svg" label="{{ row.icon }}"></wa-icon>{% endif %}</td>
-        <td>{{ row.temp_f if row.temp_f is not none else "—" }}</td>
+        <td class="condition-cell">{% if row.icon %}<wa-icon src="/static/vendor/icons/{{ row.icon }}.svg" label="{{ row.icon }}"></wa-icon>{% endif %}<strong>{{ row.temp_f if row.temp_f is not none else "—" }}°</strong></td>
         <td>
-          {{ "%.2f" | format(row.precip_in) if row.precip_in is not none else "—" }}
+          <strong>{{ "%.2f" | format(row.precip_in) if row.precip_in is not none else "—" }}</strong>
           {%- if row.precip_prob is not none %} ({{ row.precip_prob }}%){% endif %}
         </td>
-        <td>{{ row.wind_mph }}/{{ row.gust_mph }}</td>
+        <td><strong>{{ row.wind_mph }}</strong><span class="unit-muted"> / {{ row.gust_mph }} mph</span></td>
         <td class="badges">
           {% for t in row.triggers %}
           <wa-badge variant="{{ 'danger' if t.level == 'severe' else 'warning' }}">{{ t.rule }}</wa-badge>
@@ -57,7 +61,7 @@
 
   {% for row in result.rows %}
   <div class="detail" data-show="$selected == {{ row.n }}">
-    <h3>{% if row.kind == "stop" %}{{ row.place }}{% else %}Waypoint (row {{ row.n }}){% endif %}</h3>
+    <div class="detail-heading"><p class="eyebrow">SELECTED FORECAST</p><h3>{% if row.kind == "stop" %}{{ row.place }}{% else %}Waypoint {{ "%02d" | format(row.n + 1) }}{% endif %}</h3></div>
     {% if row.window %}
     <table class="hours">
       <thead><tr><th>Hour</th><th>°F (feels)</th><th>in/h (%)</th><th>wind/gust</th><th></th><th>level</th></tr></thead>

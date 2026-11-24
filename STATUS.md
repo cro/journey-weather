@@ -2,9 +2,9 @@
 
 Road-trip weather planner. Design & rationale live in **[PLAN.md](PLAN.md)** — read it first; this file is *state + traps*, not a spec restatement.
 
-## Where it stands (2026-10-09)
+## Where it stands (2026-11-10)
 
-**All 7 milestones complete and verified. §10.1 dwell time shipped 2026-10-09** (see session log at the bottom). Latest change: the Trap 1 boot assertion — `base.html` now *proves* Webawesome registration before loading Datastar (`await import`), closing the last follow-up item; 127 tests pass (`uv run pytest -q`, ~1 s). Earlier fixes `d69f7b9` (Trap 4) re-verified in the same live browser run: Plan → edit Leave-at → Plan updates table/map. Dev server runs as the `journey-dev` service on `0.0.0.0:8000` (LAN-reachable; `curl localhost:8000/healthz` → `{"ok":true}`). Live browser E2E done end-to-end: idle, loading, result + map, row selection, validation error, horizon error, repeat-planning.
+**All 7 milestones complete and verified. §10.1 dwell time shipped 2026-10-09.** The UI redesign and Python 3.15.2 upgrade shipped 2026-11-10 (see session log at the bottom). The current environment has a rebuilt Python 3.15.2 `.venv`; 127 tests pass (`./.venv/bin/pytest -q`). Earlier fixes `d69f7b9` (Trap 4) remain covered by the endpoint tests. The dev server is intended to run as the `journey-dev` service on `0.0.0.0:8000` (LAN-reachable; `curl localhost:8000/healthz` → `{"ok":true}`).
 
 | Milestone | Commit | What |
 |---|---|---|
@@ -18,6 +18,8 @@ Road-trip weather planner. Design & rationale live in **[PLAN.md](PLAN.md)** —
 | — map fix | `4051ab9` | map survived only one plan — see Trap 3 |
 | — re-Plan fix | `d69f7b9` | second Plan silently no-op'd — see Trap 4 |
 | — dwell time | — | §10.1: per-stop dwell shifts later arrivals + forecast hours (this session) |
+| — UI redesign | — | rugged road-trip utility styling, responsive setup/results, itinerary hierarchy |
+| — Python upgrade | — | Python 3.15.2, `requires-python >=3.15`, regenerated lockfile and virtualenv |
 
 ## The four integration traps (each cost real debugging; do not regress)
 
@@ -85,6 +87,14 @@ No accounts, no saved/shared routes, no live traffic, no stop reordering/removal
 ## Unfinished / follow-up candidates
 
 - Nothing blocking. If the Webawesome autoloader assumption is ever revisited, Trap 1 is the constraint.
+
+## Session log — 2026-11-10 (UI redesign + Python upgrade)
+
+- Redesigned the templates and CSS toward a rugged road-trip utility interface: masthead, route setup panel, numbered and alternating stop rows, responsive controls, route-conditions section, itinerary summary counts, simplified severity legend, stronger forecast rows, selected-detail styling, and mobile-friendly layout.
+- Updated `route-map.js` colors to match the new clear/watch/severe/no-data palette. The FastAPI, Datastar, and Leaflet data flow was preserved.
+- Marked the completed UI items in PLAN.md. The separate dynamic per-stop route preview enhancement remains unchecked.
+- Upgraded the project from Python 3.13 to Python 3.15.2: `.python-version`, `pyproject.toml`, and `uv.lock` were updated, and `.venv` was rebuilt with Python 3.15.2 using uv 0.12.23.
+- Verification: `Python 3.15.2`; `./.venv/bin/pytest -q` → **127 passed in 1.73s**; `git diff --check` passed. Two existing warnings remain: FastAPI/httpx TestClient deprecation and a non-writable pytest cache directory.
 
 ## Session log — 2026-10-09 (second Plan click silently did nothing)
 

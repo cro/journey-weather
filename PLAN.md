@@ -13,7 +13,7 @@ Example trip (§7): Layton, UT → Kanab, UT → Flagstaff, AZ → Phoenix, AZ �
 
 ## 2. Stack
 
-- **Python 3.13**, **uv 0.12.23** (installed via mise: `mise use -g uv@0.12.23`). Project: `uv init --package journey-weather`; run with `uv run uvicorn journey_weather.app:app --reload`.
+- **Python 3.15.2**, **uv 0.12.23** (installed via mise: `mise use -g uv@0.12.23`). Project: `uv init --package journey-weather`; run with `uv run uvicorn journey_weather.app:app --reload`.
 - Runtime deps: `fastapi`, `uvicorn[standard]`, `httpx`, `jinja2`, `aiosqlite`, `datastar-py` (1.0.3). Dev deps: `pytest`, `pytest-asyncio`.
 - Frontend: Jinja2 server-rendered HTML + **Webawesome 3.14.0** + **Datastar 1.0.4** + **Leaflet 1.9.4**. The only hand-written JS is `static/route-map.js` (one custom element, §5). No Alpine, no htmx.
 - Assets are vendored by `scripts/vendor.sh` into `src/journey_weather/static/vendor/` and committed. External requests at runtime: OSM map tiles (browser) and the upstream APIs (server).
@@ -319,7 +319,12 @@ and a walk that should take a total of 35 minutes.  Factor the dwell time into
 the path and weather forecasts.  DONE 2026-10-09 — `trip.s{i}.dwell` (0–1440 min,
 mid-route stops; departure = max(arrival + dwell, leave-at)) shifts every later
 arrival, waypoint instant, and therefore the forecast hour fetched for each row.
-- [ ] The layout for each stop line is kind of wonky.  Can you line it up better
-and use a smaller font for the field captions.  Also alternate the stop line
-backgrounds between light gray and white to make them easier to read.
+- [ ] When a stop is entered, dynamically calculate the path, number of miles,
+and travel time between it and the immediately preceding stop
+- [x] Refresh the UI with a rugged road-trip utility visual direction, responsive
+layout, stronger itinerary hierarchy, route summary, and mobile-friendly forecast
+presentation. DONE 2026-11-10 — templates and CSS updated without changing the
+FastAPI/Datastar/Leaflet data flow.
+- [x] Align stop fields, reduce caption emphasis, and alternate stop-row surfaces.
+DONE 2026-11-10 — responsive setup panel added.
 

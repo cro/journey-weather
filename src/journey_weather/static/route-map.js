@@ -1,10 +1,10 @@
 /* <route-map>: Leaflet + OSM tiles, colored pieces, numbered stop markers (PLAN.md §5). */
 
 const COLORS = {
-  clear: "#2e7d32",
-  warning: "#f9a825",
-  severe: "#c62828",
-  nodata: "#9e9e9e",
+  clear: "#2f7d55",
+  warning: "#d89022",
+  severe: "#c84b3f",
+  nodata: "#87909a",
 };
 
 class RouteMap extends HTMLElement {

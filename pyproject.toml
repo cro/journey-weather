@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "C. R. Oldham", email = "cro@ncbt.org" }
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.15"
 dependencies = [
     "aiosqlite>=0.22.1",
     "datastar-py>=1.0.3",
